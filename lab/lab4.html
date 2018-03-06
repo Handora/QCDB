@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="en"
+      xmlns:og="http://ogp.me/ns#"
+      xmlns:fb="https://www.facebook.com/2008/fbml">
+<head>
+    <meta http-equiv="content-type" content="text/html; charset=utf-8" />
+    <meta name="description" content="" />
+    <meta name="keywords" content="" />
+    <!--[if lte IE 8]><script src="../css/ie/html5shiv.js"></script><![endif]-->
+    <script src="../js/jquery.min.js"></script>
+    <script src="../js/jquery.dropotron.min.js"></script>
+    <script src="../js/skel.min.js"></script>
+    <script src="../js/skel-layers.min.js"></script>
+    <script src="../js/init.js"></script>
+    <link rel="stylesheet" href="../css/pygment.css" />
+    <noscript>
+        <link rel="stylesheet" href="../css/skel.css" />
+        <link rel="stylesheet" href="../css/style.css" />
+        <link rel="stylesheet" href="../css/style-noscript.css" />
+    </noscript>
+    <script src="//cdnjs.cloudflare.com/ajax/libs/modernizr/2.6.2/modernizr.min.js"></script>
+    <link href="http://netdna.bootstrapcdn.com/font-awesome/4.7.0/css/font-awesome.min.css" rel="stylesheet">
+    <link  href="http://fonts.googleapis.com/css?family=Anonymous+Pro:regular,italic,bold,bolditalic" rel="stylesheet" type="text/css" >
+    <!--[if lte IE 8]><link rel="stylesheet" href="/css/ie/v8.css" /><![endif]-->
+    <!--[if lte IE 9]><link rel="stylesheet" href="/css/ie/v9.css" /><![endif]-->
+    
+    
+    <meta property="og:site_name" content="CMU 15-445/645" />
+    <meta property="og:type" content="article"/>
+    <meta property="og:title" content="Project #4 - Logging &amp; Recovery - CMU 15-445/645 :: Intro to Database Systems (Fall 2017)"/>
+    <meta property="og:url" content="../project4/index.html"/>
+    <meta property="article:published_time" content="2017-12-04" />
+    <meta property="og:description" content="Overview The fourth programming project is to implement Logging and Recovery mechanism in your database system. The first task is to implement write ahead logging (WAL) under No-Force/Steal buffering policy and log every single page-level write operation and transaction command. The project is comprised of the following two tasks: Task #1 - Log Manager Task #2 - System Recovery This is a single-person project that will be completed individually (i.e., no groups). Please post all of your questions about this project on Canvas. Do not email the TAs directly with questions. The instructor and TAs will not teach you how …" />
+        <meta property="og:image"
+              content="http://15445.courses.cs.cmu.edu/fall2017/images/twitter-card.jpg"/>
+
+    <meta name="twitter:card" content="summary">
+        <meta name="twitter:site" content="@CMUDB">
+        <meta name="twitter:creator" content="@CMUDB">
+    <meta name="twitter:domain" content="..">
+            <meta property="twitter:image"
+                  content="http://15445.courses.cs.cmu.edu/fall2017/images/twitter-card.jpg"/>
+    
+    
+    <link href="http://db.cs.cmu.edu/favicon.png" rel="icon">
+
+    <title>Project #4 - Logging & Recovery | CMU 15-445/645 :: Intro to Database Systems (Fall 2017) </title>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width">
+</head>
+
+<body class=" loading">
+
+    <!-- Header -->
+    <header id="header" >
+        <h1 class="logo">
+            <a href="..">CMU 15-445/645</a>
+        </h1>
+        <nav id="nav">
+            <ul>
+                <li ><a href="index.html">Home</a></li>
+                            <li><a href="../assignments.html">Assignments</a>
+                            <li><a href="../schedule.html">Schedule</a>
+                            <li><a href="../syllabus.html">Syllabus</a>
+                <!--
+                <li class="submenu">
+                    <a href="../">Blog</a>
+                    <ul>
+                    </ul>
+                </li>
+                -->
+                <li> <a title="Youtube" href="https://www.youtube.com/playlist?list=PLSE8ODhjZXjYutVzTeAds8xUt1rcmyT7x" target="_new"><i class="fa fa-youtube"></i> Youtube</a>
+                <li> <a title="Canvas" href="https://canvas.cmu.edu/courses/1678" target="_new"><i class="fa fa-comments-o"></i> Canvas</a>
+                
+            </ul>
+        </nav>
+    </header>
+
+<!-- Main -->
+<article id="main">
+
+    <header class="special container">
+        <span class="icon fa-database"></span>
+        <h2>Project #4 - Logging & Recovery</h2>
+    </header>
+
+    <section class="wrapper style4 container">
+  
+        <!-- Content -->
+        <div class="content">
+            <section>
+                <p><h1>Overview</h1>
+<p>The fourth programming project is to implement <b>Logging</b> and  <b>Recovery</b> mechanism in your database system. The first task is to implement write ahead logging (WAL) under <b>No-Force/Steal</b> buffering policy and log every single page-level write operation and transaction command.</p>
+<p>The project is comprised of the following two tasks:
+<ul class="default">
+    <li> <a href="#log_manager"><b>Task #1 - Log Manager</b></a>
+    <li> <a href="#recovery"><b>Task #2 - System Recovery</b></a>
+</ul></p>
+<p>This is a single-person project that will be completed individually (i.e., no groups).</p>
+<p class="warning bg-danger">
+    <i class="trigger fa fa-question-circle fa-lg"></i>
+    Please post all of your questions about this project on Canvas. Do <b>not</b> email the TAs directly with questions. The instructor and TAs will <b>not</b> teach you how to debug your code.
+</p>
+
+<!-- START project4 -->
+
+<!-- AUTO-GENERATED BY GENERATE-SCHEDULE SCRIPT -->
+
+<!-- ANY MODIFICATIONS WILL BE OVERWRITTEN -->
+
+<ul>
+<li><b>Release Date:</b> Nov 15, 2017</li>
+<li><b>Due Date:</b> Dec 06, 2017 @ 11:59pm
+<!-- END project4 --></li>
+</ul>
+<h1>Project Specification</h1>
+<p>Like the previous project, we are providing you with stub classes that contain the API that you need to implement. You should <strong>not</strong> modify the signatures for the pre-defined functions in these classes. If you do this, then it will break the test code that we will use to grade your assignment you end up getting no credit for the project. If a class already contains certain member variables, you should <strong>not</strong> remove them. But you may add private helper functions/member variables to these classes in order to correctly realize the functionality.</p>
+<p>The correctness of this project depends on the correctness of your implementation of previous projects, we will <strong>not</strong> give solutions or binary files. However, this project may differ from the last ones in several aspects. Instead of implementing a stand-alone component, it requires you to explore a code base that we have already provided and find the <strong>right place</strong> to add your logic. It focuses on the insert/delete/search operations on table heap (<tt class="filepath">include/table/table_heap.h</tt>) as well as  interactions between log manager, buffer manager, and transaction manager.</p>
+<!-- **************************************************** -->
+
+<!-- Logging                                              -->
+
+<!-- **************************************************** -->
+
+<h2 id="log_manager">Task #1 - Log Manager</h2>
+
+<p>To achieve the goal of atomicity and durability, the database system must output to stable storage information describing the modifications made by any transaction, this information can help us ensure that all modifications performed by committed transactions are reflected in the database (perhaps during the course of recovery actions after a crash). It can also help us ensure that no modifications made by an aborted or crashed transaction persist in the database. The most widely used structure for recording database modifications is the log. The log is a sequence of log records, recording all the update activities in the database. We have provided with you the basic structure of log record(<tt class="filepath">include/logging/log_record.h</tt>) and corresponding helper methods.</p>
+<p>In your implementation, there will be a global <code>LogManager</code> object for the entire system (similar to your <code>BufferPoolManager</code>). The <code>TablePage</code> class will explicitly create a log record (before any update operations) and invoke <code>SerializeLogRecord</code> method of <code>LogManager</code> to write it into log buffer when the global variable <code>ENABLE_LOGGING</code> (<tt class="filepath">include/common/config.h</tt>) flag is set to be true.
+We recommend you to read <a onclick="javascript:pageTracker._trackPageview('/outgoing/www.justsoftwaresolutions.co.uk');" href="https://www.justsoftwaresolutions.co.uk/threading/locks-mutexes-semaphores.html">this article</a> to refresh your C++ concurrency knowledge. More detailed documentation about condition variable is <a onclick="javascript:pageTracker._trackPageview('/outgoing/en.cppreference.com');" href="http://en.cppreference.com/w/cpp/thread/condition_variable">available here</a>.</p>
+<h3>CHANGES SINCE PROJECT #3</h3>
+<p>This list contains classes we have changed since the previous project. You may wanna read them carefully and adjust your original implementation based on the updates in order to pass test cases.</p>
+<ul class="default">
+    <li>Global Variables</b>:
+    We have added a global variable called <code>ENABLE_LOGGING</code> within config.h file. Only when the variable is set to be true can you enable all the logging functionalities. You may need to explicitly set it to be false in order to pass some of the previous test cases. The <code>LOG_TIMEOUT</code> is a constant variable defined within config.h file, for every <code>LOG_TIMEOUT</code> seconds, your Log Manager needs to execute a flush operation (more details int the next section).
+
+    <li><b>Buffer Pool Manager</b>:
+    We modified the constructor to take in references to the system's DiskManager and LogManager as input parameters. The default value for log_manager is nullptr, and log_manager is only valid when <code>ENABLE_LOGGING</code> is set to be true. We have also removed the <code>FlushAllPage()</code> function interface.
+
+    <li><b>Disk Manager</b>:
+    The DiskManager now creates the database file as well as log file inside its constructor. We have also provided separate helper functions <code>WriteLog</code> and <code>ReadLog</code> to support accessing the log file.
+
+    <li><b>BPlusTreePage</b>:
+    We added a member variable <code>lsn_</code> to record page log sequence number. You do not need to update lsn within your index implementation, we only test logging and recovery functionalities on table page level. But you may need to double check your init method for both <code>BPlusTreeInternalPage</code> and <code>BPlusTreeLeafPage</code> if you are hard-coded metadata size.
+
+    <li><b>Page</b>:
+    We added <code>GetLSN</code> and <code>SetLSN</code> helper functions. Remember log sequence number is a 4 byte int32_t variable that is stored within page data_ array.
+
+    <li><b>Transaction</b>:
+    We added <code>GetPrevLSN</code> and <code>SetPrevLSN</code> helper functions. Each transaction is responsible for maintaining previous log sequence number for undo purpose in recovery (detailed information, please consult with textbook Chapters 16.8).
+
+    <li><b>LogRecord</b>:
+    We have provided the implementation of physiological LogRecord that support different type of write operations within database system. Each log type corresponds to a write operation within <code>TablePage</code> class (<tt class="filepath">page/table_page.h</tt>, please make sure you understand the record structure before implementation.
+
+  </ul>
+
+<h3>REQUIREMENTS AND HINTS</h3>
+<p>The files you need to modify for this task are the <code>LogManager</code> class (<tt class="filepath">logging/log_manager.cpp</tt> and <tt class="filepath">logging/log_manager.h</tt>) plus the <code>TablePage</code> class (<tt class="filepath">table/table_page.cpp</tt> and <tt class="filepath">include/logging/table_page.h</tt>) plus the <code>TransactionManager</code> class (<tt class="filepath">concurrency/transaction_manager.cpp</tt> and <tt class="filepath">include/concurrency/transaction_manager.h</tt>) plus your original implementation of <code>BufferPoolManager</code> class(<tt class="filepath">table/table_page.cpp</tt> and <tt class="filepath">include/logging/table_page.h</tt>). You will need to complete the following functionalities:</p>
+<ul class="default">
+    <li>Inside <code>RunFlushThread</code> function in Log manager, you need to start a <b>separate background</b> thread which is responsible for flushing the logs into disk file. The thread is triggered every <code>LOG_TIMEOUT</code> seconds or when the log buffer is full. Since your Log Manager need to perform asynchronous I/O operations, you will maintain <b>two</b> log buffers, one for flushing (We will call it as <code>flush_buffer</code>) one for concurrently appending log records (We will call it as <code>log_buffer</code>). And you may consider swap buffers under following <b> three </b> situations. (1) When log_buffer is full. (2) When <code>LOG_TIMEOUT</code> is triggered. (3) When buffer pool is going to evict a dirty page from LRU replacer.
+
+    <li>Your Log Manager will integrate the <a onclick="javascript:pageTracker._trackPageview('/outgoing/wiki.postgresql.org');" href="https://wiki.postgresql.org/wiki/Group_commit">group commit</a> feature. Motivation behind group commit is to amortize the costs of each fsync() over multiple commits from multiple parallel transactions. If there are say 10 transactions in parallel trying to commit, we can force all of them to disk at once with a single <code>fsync()</code> call, rather than do one fsync() for each. This can greatly reduce the need for <code>fsync()</code> calls, and consequently greatly improve the commits-per-second throughput. Within <code>TransactionManager</code>, whenever you call <code>Commit</code> or <code>Abort</code> method, you need to make sure your log records are permanently stored on disk file before release the locks. But instead of <b> forcing </b> flush, you need to wait for <code>LOG_TIMEOUT</code> or other operations to implicitly trigger the flush operations.
+
+    <li>Before your buffer pool manager evicts a dirty page from LRU replacer and write this page back to db file, it needs to flush logs up to <code>pageLSN</code>. You need to compare <code> persistent_lsn_</code> (a member variable maintains by Log Manager) with your <code>pageLSN</code>. However unlike group commit, buffer pool can force log manager to flush log buffer, but still needs to wait for logs to be permanently stored before continue.
+
+    <li>Add corresponding logics within <code>TablePage</code> class methods to deal with run-time WAL logging. You need to (1) explicitly create a log record (<tt class="filepath">include/logging/log_record.h</tt>) (2) invoke <code>SerializeLogRecord</code> method of Log Manager to write it into log_buffer when the global variable <code>ENABLE_LOGGING</code>(<tt class="filepath">include/common/config.h</tt>) is set to be true. (3) Update prevLSN for current transaction. (4) Update LSN for current page
+</ul>
+
+<p><b>Important:</b> You should first take a look at the files we mention in this and previous sections to become familiar with the APIs and member variables we provide. You have the freedom of adding any necessary data structures in <tt class="filepath">log_manager.h</tt> and <tt class="filepath">log_record.h</tt>. You should consult with Chapters 16.8 in the textbook and make sure that your implementation follows the ARIES.(Except for the check-pointing part). Since Log Manager need to deal with background thread and thread synchronization stuff, we recommend you to take a look at <a onclick="javascript:pageTracker._trackPageview('/outgoing/en.cppreference.com');" href="http://en.cppreference.com/w/cpp/thread/future">Future</a> and <a onclick="javascript:pageTracker._trackPageview('/outgoing/en.cppreference.com');" href="http://en.cppreference.com/w/cpp/thread/promise">Promise</a>.</p>
+<!-- **************************************************** -->
+
+<!-- Recovery                                             -->
+
+<!-- **************************************************** -->
+
+<h2 id="recovery">Task #2 - System Recovery</h2>
+
+<p>The next part of the project is to implement the ability for the DBMS to recover its state from the log file.</p>
+<h3>REQUIREMENTS AND HINTS</h3>
+<p>The recovery process for our database system is pretty straightforward. Since we do not enable check-pointing, there is no need for analysis pass. The only file you need to modify for this task is the <code>LogRecovery</code> class (<tt class="filepath">logging/log_recovey.cpp</tt> and <tt class="filepath">include/logging/log_recovey.h</tt>). You will need to implement the following functions:</p>
+<ul class="default">
+    <li><code>DeserializeLogRecord</code>:
+    Deserialize and reconstruct a log record from log buffer. If the return value is true then Deserialization is successful, otherwise log buffer may contain incomplete log record.
+
+    <li><code>Redo</code>:
+    Redo pass on <b>TABLE PAGE</b> level(<tt class="filepath">include/table/table_page.h</tt>).
+    Read the log file from the beginning to end (you must prefetch log records into buffer to reduce unnecessary I/O operations), for each log record, redo the action <b>unless</b> page is already more up-to-date than this record. Also build <code>active_txn_ table</code> and <code>lsn_mapping_ table</code> along the way.
+
+    <li><code>Undo</code>:
+    Undo pass on <b>TABLE PAGE</b> level(<tt class="filepath">include/table/table_page.h</tt>).
+    Iterate through <code>active_txn_ table</code> and undo every operations within each transaction. You <b>DON NOT</b> need to worry about crash during recovery process, thus no complementary logging is needed.
+</ul>
+
+<p><b>Important:</b>Our suggestion is to first consult with Chapters 16.8 in the textbook to make sure that you understand the whole process of recovery and what is redo/undo pass trying to do. Then figure out each write operation within class <code>TablePage</code> and what is the corresponding complementary operation. (e.g To undo Insert operation, you need to call ApplyDelete function instead of MarkDelete)</p>
+<h2>Setting Up Your Development Environment</h2>
+<p>Download the project source code <a onclick="javascript:pageTracker._trackPageview('/downloads/{filename}/files/sqlite-fall2017.tar.gz');" href="{filename}/files/sqlite-fall2017.tar.gz">here</a>. This version has additional files that were added after project #3 so you need to update your local copy.</p>
+<p>Make sure that your source code has the following <tt class="filepath">VERSION.txt</tt> file:</p>
+<pre>
+Created: Nov 21 2017 @ 00:28:55
+Last Commit: be0f6dd92b4c3eaa52a6456bd8847773ab65b3ed
+</pre>
+
+<h2>Testing</h2>
+<p>You can test the individual components of this assignment using our testing framework. We use <a onclick="javascript:pageTracker._trackPageview('/outgoing/github.com');" href="https://github.com/google/googletest">GTest</a> for unit test cases.
+You can compile and run each test individually from the command-line:</p>
+<pre>
+cd build
+make log_manager_test
+./test/log_manager_test
+</pre>
+
+<p>In the log_manager_test, we will first start the system, create a table, populate several tuples and then shut down the system. When the system restarts and has completed the recovery phases, it should be back to the consistent state before crash.</p>
+<p><b>Important:</b> These tests are only a subset of the all the tests that we will use to evaluate and grade your project. You should write additional test cases on your own to check the complete functionality of your implementation.</p>
+<h2>Development Hints</h2>
+<p>Instead of using <code>printf</code> statements for debugging, use the <code>LOG_*</code> macros for logging information like this:
+<pre>
+LOG_INFO("# RID: %s", rid-&gt;ToString().c_str());
+LOG_DEBUG("Evict page %d", page_id);
+</pre></p>
+<p>To enable logging in your project, you will need to reconfigure it like this:
+<pre>
+cd build
+cmake -DCMAKE_BUILD_TYPE=DEBUG ..
+make
+</pre></p>
+<p>The different logging levels are defined in <tt class="filepath">src/include/common/logger.h</tt>. After enabling logging, the logging level defaults to <code>LOG_LEVEL_INFO</code>. Any logging method with a level that is equal to or higher than <code>LOG_LEVEL_INFO</code> (e.g., <code>LOG_INFO</code>, <code>LOG_WARN</code>, <code>LOG_ERROR</code>) will emit logging information.</p>
+<p>Using <a onclick="javascript:pageTracker._trackPageview('/outgoing/www.cplusplus.com');" href="http://www.cplusplus.com/reference/cassert/assert/">assert </a>to force check the correctness of your implementation. For example, when you try to delete a page, the <code>page_count</code> must be equal to 0. And when you try to unpin a page, the <code>page_count</code> must be larger than 0.</p>
+<p>Using a relatively small value of page size at the beginning test stage, it would be easier for you to check whether you have done the logging &amp; recovery in the correct way. You can change the page size in configuration file (<tt class="filepath">src/include/common/config.h</tt>).</p>
+<h1>Grading Rubric</h1>
+<p>Each project submission will be graded based on the following criteria:</p>
+<ol>
+<li>Does the submission successfully execute all of the test cases and produce the correct answer?</li>
+<li>Does the submission execute without any memory leaks?</li>
+</ol>
+<p>Note that we will use additional test cases that are more complex and go beyond the sample test cases that we provide you.</p>
+<h1>Late Policy</h1>
+<p>See the <a href="#late-policy">late policy</a> in the syllabus.</p>
+<h1>Submission</h1>
+<p>After completing the assignment, you can submit your implementation of to Autolab:</p>
+<ul>
+<li><a onclick="javascript:pageTracker._trackPageview('/outgoing/autolab.andrew.cmu.edu');" href="https://autolab.andrew.cmu.edu/courses/15445-f17">https://autolab.andrew.cmu.edu/courses/15445-f17</a>.</li>
+</ul>
+<p>You only need to include the following files:</p>
+<ul class="default">
+    <li> Every file for Project 1 (6 in total)
+    <li> Every file for Project 2 (10 in total)
+    <li> Every file for Project 3 (2 in total)
+    <li> <tt class="filepath">src/logging/log_manager.cpp</tt>
+    <li> <tt class="filepath">src/include/logging/log_manager.h</tt>
+    <li> <tt class="filepath">src/logging/log_recovery.cpp</tt>
+    <li> <tt class="filepath">src/include/logging/log_recovery.h</tt>
+    <li> <tt class="filepath">src/include/logging/log_record.h</tt>
+    <li> <tt class="filepath">src/page/table_page.cpp</tt>
+    <li> <tt class="filepath">src/concurrency/transaction_manager.cpp</tt>
+</ul>
+
+<p>You can submit your answers as many times as you like and get immediate feedback. Your score will be sent via email to your Andrew account within a few minutes after your submission.</p>
+<h1>Collaboration Policy</h1>
+<ul>
+<li>Every student has to work individually on this assignment.</li>
+<li>Students are allowed to discuss high-level details about the project with others.</li>
+<li>Students are <strong>not</strong> allowed to copy the contents of a white-board after a group meeting with other students.</li>
+<li>Students are <strong>not</strong> allowed to copy the solutions from another colleague.</li>
+</ul>
+<p class="warning bg-danger">
+    <i class="trigger fa fa-exclamation-triangle fa-lg"></i>
+    <b>WARNING:</b> All of the code for this project must be your own. You may not copy source code from other students or other sources that you find on the web. Plagiarism <b>will not</b> be tolerated. See CMU's <a onclick="javascript:pageTracker._trackPageview('/outgoing/www.cmu.edu');" href="http://www.cmu.edu/policies/documents/Academic%20Integrity.htm">Policy on Academic Integrity</a> for additional information.
+</p></p>
+                <div class="published">
+                    <time datetime="2017-12-04 15:27:37.510839-05:00"> <B>Last Updated:</B> Dec 04, 2017</time>
+                </div>
+            </section>
+        </div>
+    </section>
+</article>
+
+<!-- Footer -->
+<footer id="footer">
+
+    <ul class="icons">
+    </ul>
+    
+    <span class="copyright">
+    <a onclick="javascript:pageTracker._trackPageview('/outgoing/db.cs.cmu.edu');" href="http://db.cs.cmu.edu" title="Carnegie Mellon Database Group" class="image-link"><img src="../images/cmu-db-group.png"></a>
+    </span>
+
+</footer>    <!-- Google Analytics -->
+    <script type="text/javascript">
+
+        var _gaq = _gaq || [];
+        _gaq.push(['_setAccount', 'UA-4067813-24']);
+        _gaq.push(['_trackPageview']);
+
+        (function () {
+            var ga = document.createElement('script');
+            ga.type = 'text/javascript';
+            ga.async = true;
+            ga.src = ('https:' == document.location.protocol ? 'https://ssl' : 'http://www') + '.google-analytics.com/ga.js';
+            var s = document.getElementsByTagName('script')[0];
+            s.parentNode.insertBefore(ga, s);
+        })();
+    </script>
+    <!-- End Google Analytics Code -->
+
+</body>
+</html>

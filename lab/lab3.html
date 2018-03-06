@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="en"
+      xmlns:og="http://ogp.me/ns#"
+      xmlns:fb="https://www.facebook.com/2008/fbml">
+<head>
+    <meta http-equiv="content-type" content="text/html; charset=utf-8" />
+    <meta name="description" content="" />
+    <meta name="keywords" content="" />
+    <!--[if lte IE 8]><script src="../css/ie/html5shiv.js"></script><![endif]-->
+    <script src="../js/jquery.min.js"></script>
+    <script src="../js/jquery.dropotron.min.js"></script>
+    <script src="../js/skel.min.js"></script>
+    <script src="../js/skel-layers.min.js"></script>
+    <script src="../js/init.js"></script>
+    <link rel="stylesheet" href="../css/pygment.css" />
+    <noscript>
+        <link rel="stylesheet" href="../css/skel.css" />
+        <link rel="stylesheet" href="../css/style.css" />
+        <link rel="stylesheet" href="../css/style-noscript.css" />
+    </noscript>
+    <script src="//cdnjs.cloudflare.com/ajax/libs/modernizr/2.6.2/modernizr.min.js"></script>
+    <link href="http://netdna.bootstrapcdn.com/font-awesome/4.7.0/css/font-awesome.min.css" rel="stylesheet">
+    <link  href="http://fonts.googleapis.com/css?family=Anonymous+Pro:regular,italic,bold,bolditalic" rel="stylesheet" type="text/css" >
+    <!--[if lte IE 8]><link rel="stylesheet" href="/css/ie/v8.css" /><![endif]-->
+    <!--[if lte IE 9]><link rel="stylesheet" href="/css/ie/v9.css" /><![endif]-->
+    
+    
+    <meta property="og:site_name" content="CMU 15-445/645" />
+    <meta property="og:type" content="article"/>
+    <meta property="og:title" content="Project #3 - Concurrency Control - CMU 15-445/645 :: Intro to Database Systems (Fall 2017)"/>
+    <meta property="og:url" content="../project3/index.html"/>
+    <meta property="article:published_time" content="2017-10-26" />
+    <meta property="og:description" content="Overview The third programming project is to implement a concurrent index and lock manager in your database system. The first task is to implement a lock manager which is responsible for keeping track of the tuple-level locks issued to transactions and supporting shared &amp; exclusive lock grant and release. The second task is an extension of project #2 where you will enable your B+tree index to support multi-threaded updates. The project is comprised of the following two tasks: Task #1 - Lock Manager Task #2 - Concurrent Index This is a single-person project that will be completed individually (i.e., no groups …" />
+        <meta property="og:image"
+              content="http://15445.courses.cs.cmu.edu/fall2017/images/twitter-card.jpg"/>
+
+    <meta name="twitter:card" content="summary">
+        <meta name="twitter:site" content="@CMUDB">
+        <meta name="twitter:creator" content="@CMUDB">
+    <meta name="twitter:domain" content="..">
+            <meta property="twitter:image"
+                  content="http://15445.courses.cs.cmu.edu/fall2017/images/twitter-card.jpg"/>
+    
+    
+    <link href="http://db.cs.cmu.edu/favicon.png" rel="icon">
+
+    <title>Project #3 - Concurrency Control | CMU 15-445/645 :: Intro to Database Systems (Fall 2017) </title>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width">
+</head>
+
+<body class=" loading">
+
+    <!-- Header -->
+    <header id="header" >
+        <h1 class="logo">
+            <a href="..">CMU 15-445/645</a>
+        </h1>
+        <nav id="nav">
+            <ul>
+                <li ><a href="index.html">Home</a></li>
+                            <li><a href="../assignments.html">Assignments</a>
+                            <li><a href="../schedule.html">Schedule</a>
+                            <li><a href="../syllabus.html">Syllabus</a>
+                <!--
+                <li class="submenu">
+                    <a href="../">Blog</a>
+                    <ul>
+                    </ul>
+                </li>
+                -->
+                <li> <a title="Youtube" href="https://www.youtube.com/playlist?list=PLSE8ODhjZXjYutVzTeAds8xUt1rcmyT7x" target="_new"><i class="fa fa-youtube"></i> Youtube</a>
+                <li> <a title="Canvas" href="https://canvas.cmu.edu/courses/1678" target="_new"><i class="fa fa-comments-o"></i> Canvas</a>
+                
+            </ul>
+        </nav>
+    </header>
+
+<!-- Main -->
+<article id="main">
+
+    <header class="special container">
+        <span class="icon fa-database"></span>
+        <h2>Project #3 - Concurrency Control</h2>
+    </header>
+
+    <section class="wrapper style4 container">
+  
+        <!-- Content -->
+        <div class="content">
+            <section>
+                <p><h1>Overview</h1>
+<p>The third programming project is to implement a <b>concurrent index</b> and  <b>lock manager</b> in your database system. The first task is to implement a lock manager which is responsible for keeping track of the <b>tuple-level locks</b> issued to transactions and supporting shared &amp; exclusive lock grant and release. The second task is an extension of <a href="../project2">project #2</a> where you will enable your B+tree index to support multi-threaded updates.</p>
+<p>The project is comprised of the following two tasks:
+<ul class="default">
+    <li> <a href="#lock_manager"><b>Task #1 - Lock Manager</b></a>
+    <li> <a href="#concurrent_index"><b>Task #2 - Concurrent Index</b></a>
+</ul></p>
+<p>This is a single-person project that will be completed individually (i.e., no groups).</p>
+<p class="warning bg-danger">
+    <i class="trigger fa fa-question-circle fa-lg"></i>
+    Please post all of your questions about this project on Canvas. Do <b>not</b> email the TAs directly with questions. The instructor and TAs will <b>not</b> teach you how to debug your code.
+</p>
+
+<!-- START project3 -->
+
+<!-- AUTO-GENERATED BY GENERATE-SCHEDULE SCRIPT -->
+
+<!-- ANY MODIFICATIONS WILL BE OVERWRITTEN -->
+
+<ul>
+<li><b>Release Date:</b> Oct 25, 2017</li>
+<li><b>Due Date:</b> Nov 15, 2017 @ 11:59pm
+<!-- END project3 --></li>
+</ul>
+<h1>Project Specification</h1>
+<p>Like the first project, we are providing you with stub classes that contain the API that you need to implement. You should <strong>not</strong> modify the signatures for the pre-defined functions in these classes. If you do this, then it will break the test code that we will use to grade your assignment you end up getting no credit for the project. If a class already contains certain member variables, you should <strong>not</strong> remove them. But you may add private helper functions/member variables to these classes in order to correctly realize the functionality.</p>
+<p>The correctness of this project depends on the correctness of your implementation of previous projects, we will <strong>not</strong> provide solutions or binary file. Since the <a href="#concurrent_index">second task</a> is closely related to the second project, we recommend that you get your index working correctly before you proceed with this project. You will be allowed to submit your second project to AutoLab after the second project deadline.</p>
+<!-- **************************************************** -->
+
+<!-- Lock Manager
+<!-- **************************************************** -->
+
+<h2 id="lock_manager">Task #1 - Lock Manager</h2>
+
+<p>To ensure correct interleaving of transactions' operations, the DBMS will use a lock manager (LM) to control when transactions are allowed to access data items. The basic idea of a LM is that it maintains an internal data structure about the locks currently held by active transactions. Transactions then issue lock requests to the LM before they are allowed to access a data item. The LM will either grant the lock to the calling transaction, block that transaction, or abort it.</p>
+<p>In your implementation, there will be a global LM for the entire system (similar to your buffer pool manager). The <code>TableHeap</code> class will use your LM to acquire locks on tuple records (by record id <code>RID</code>) whenever a transaction wants to access/modify a tuple. The DBMS will only support <strong>REPEATABLE READ</strong> isolation level (i.e., you do not need to support range-locks so it cannot support <strong>SERIALIZABLE</strong> isolation).</p>
+<p>This task requires you to implement a tuple-level LM that supports both <em>two-phase locking</em> (2PL) and <em>strict two-phase locking</em> (S2PL). The system will pass in a flag to the LM to say what version of 2PL it will use during its initialization. Your LM will implement the <strong>WAIT-DIE</strong> policy to prevent deadlocks. In the repository, we are providing you with a <code>Transaction</code> context handle (<tt class="filepath">include/concurrency/transaction.h</tt>) that maintains the current state of the transaction (i.e., GROWING, SHRINKING, ABORTED, COMMITTED) and information about its acquired locks. The LM will need to check/update the state of transaction correctly. Any failed lock operation should return false and change the transaction state to ABORTED (implicit abort).</p>
+<p>We recommend you to read <a onclick="javascript:pageTracker._trackPageview('/outgoing/www.justsoftwaresolutions.co.uk');" href="https://www.justsoftwaresolutions.co.uk/threading/locks-mutexes-semaphores.html">this article</a> to refresh your C++ concurrency knowledge. More detailed documentation is <a onclick="javascript:pageTracker._trackPageview('/outgoing/en.cppreference.com');" href="http://en.cppreference.com/w/cpp/thread">available here</a>.</p>
+<h3>REQUIREMENTS AND HINTS</h3>
+<p>The only file you need to modify for this task is the <code>LockManager</code> class (<tt class="filepath">concurrency/lock_manager.cpp</tt> and <tt class="filepath">concurrency/lock_manager.h</tt>). You will need to implement the following functions:</p>
+<ul class="default">
+    <li><code>LockShared(Transaction, RID)</code>:
+    Transaction <b>txn</b> tries to take a shared lock on record id <b>rid</b>. This should be blocked on waiting and should return true when granted. Return false if transaction is rolled back (aborts).
+
+    <li><code>LockExclusive(Transaction, RID)</code>:
+    Transaction <b>txn</b> tries to take an exclusive lock on record id <b>rid</b>. This should be blocked on waiting and should return true when granted. Return false if transaction is rolled back (aborts).
+
+    <li><code>LockUpgrade(Transaction, RID)</code>:
+    Transaction <b>txn</b> tries to upgrade a shared to exclusive lock on record id <b>rid</b>. This should be blocked on waiting and should return true when granted. Return false if transaction is rolled back (aborts).
+
+    <li><code>Unlock(Transaction, RID)</code>:
+    Unlock the record identified by the given record id that is held by the transaction. There is only a tiny corner case you will fail on <code>Unlock</code> method (return false). (Hint: Think about the differences between 2PL and strict 2PL)
+</ul>
+
+<p>You should first take a look at the <tt class="filepath">transaction.h</tt> and <tt class="filepath">lock_manager.h</tt> to become familiar with the API and member variables we provide. You have the freedom of adding any necessary data structures in  <tt class="filepath">lock_manager.h</tt>. You should consult with Chapters 15.1-15.2 in the textbook and make sure that your implementation follows the 2PL protocol carefully.</p>
+<h3>COMMON PITFALLS</h3>
+
+<ul class="default">
+    <li>The LM's constructor will be told whether it should follow strict 2PL or not. You should also maintain state of transaction. For example, the states of transaction may be changed from <code>GROWING</code> phase to <code>SHRINKING</code> phase due to <code>unlock</code> operation.
+
+    <li>You should also keep track of the shared/exclusive lock acquired using <code>shared_lock_set_</code> and <code>exclusive_lock_set_</code> so that when the <code>TransactionManager</code> wants to commit/abort a transaction, the LM can release them properly.
+</ul>
+
+<!-- **************************************************** -->
+
+<!-- Concurrent Index
+<!-- **************************************************** -->
+
+<h2 id="concurrent_index">Task #2 -Concurrent Index</h2>
+
+<p>In this part, you need to update your original single-threaded B+Tree index so that it can support concurrent operations. We will use the latch crabbing technique described in class and in the textbook. The thread traversing the index will acquire then release latches on B+Tree pages. A thread can <strong>only</strong> release latch on a parent page if its child page considered "safe". Note that the definition of "safe" can vary based on what kind of operation the thread is executing:</p>
+<ul class="default">
+    <li><code>Search</code>:
+    Starting with root page, grab read (<b>R</b>) latch on child
+    Then release latch on parent as soon as you land on the child page.
+
+    <li><code>Insert</code>:
+    Starting with root page, grab write (<b>W</b>) latch on child.
+    Once child is locked, check if it is safe, in this case, not full. If child is safe, release <b>all</b> locks on ancestors.
+
+    <li><code>Delete</code>:
+    Starting with root page, grab write (<b>W</b>) latch on child.
+    Once child is locked, check if it is safe, in this case, at least half-full. (NOTE: for root page, we need to check with different standards) If child is safe, release <b>all</b> locks on ancestors.
+</ul>
+
+<p><b>Important:</b>The write up only describe the basic concepts behind latch crabbing, before you start your implementation, please consult with lecture and textbook Chapter 15.10.</p>
+<h3>REQUIREMENTS AND HINTS</h3>
+
+<ul class="default">
+    <li>You are <b>not allowed</b> to use a global scope latch to protect your data structure, that is to say, you can't lock the whole index and only unlock the latch when operations are done. We will check grammatically and manually to make sure you are doing the latch crabbing in the right way.
+
+    <li>We have provided the implementation of read-write latch (<tt class="filepath">src/include/common/rwmutex.h</tt>). And have already added helper functions under page header file to acquire and release latch (<tt class="filepath">src/include/page/page.h</tt>).
+
+    <li>We will not add any <b>mandatory</b> interfaces in the B+Tree index. You can write any private/helper functions in your implementation as long as you keep all the original public interfaces intact for test purpose.
+
+    <li>For this task, you have to use the passed in pointer parameter called <code>transaction</code> (<tt class="filepath">src/include/concurrency/transaction.h</tt>). It provides methods to store the page on which you have acquired latch while traversing through B+ tree and also methods to store the page which you have deleted during <code>Remove</code> operation. Our suggestion is to look closely at the <code>FindLeafPage()</code> method within B+ tree, you may wanna twist your previous implementation(You may need to change to <b>return value</b> for this method) and add the logic of latch crabbing within this particular method.
+
+    <li>The return value for FetchPage() in buffer pool manager is a pointer that points to a Page instance(<tt class="filepath">src/include/page/page.h</tt>). You can grab a latch on <code>Page</code>, but you cannot grab a latch on B+Tree node (neither internal node nor leaf node).
+</ul>
+
+<h3>COMMON PITFALLS</h3>
+
+<ul class="default">
+    <li>Think carefully about the order and relationship between <code>UnpinPage(page_id, is_dirty)</code> method from buffer pool manager class and <code>UnLock()</code> methods from page class. You have to release the latch on that page <b>BEFORE</b> you unpin the same page from the buffer pool.
+
+    <li>If you are implementing concurrent B+tree index correctly, then every thread will <b>ALWAYS</b> acquire latch from root to bottom. When you release the latch, make sure you follow the same order (a.k.a from root to bottom) to avoid possible deadlock situation.
+
+    <li>One of the corner case is that when insert and delete, the member variable <b>root_page_id</b> (<tt class="filepath">src/include/index/b_plus_tree.h</tt>) will also be updated. It is your responsibility to protect from concurrent update of this shared variable(hint: add an abstract layer in B+ tree index, you can use std::mutex to protect this variable)
+</ul>
+
+<h2>Setting Up Your Development Environment</h2>
+<p>Download the project source code <a onclick="javascript:pageTracker._trackPageview('/downloads/{filename}/files/sqlite-fall2017.tar.gz');" href="{filename}/files/sqlite-fall2017.tar.gz">here</a>. This version has additional files that were added after project #2 so you need to update your local copy.</p>
+<p>Make sure that your source code has the following <tt class="filepath">VERSION.txt</tt> file:</p>
+<pre>
+Created: Oct 26 2017 @ 18:01:53
+Last Commit: fc181c8abb34ddb964c7f75cf70a16d994a2c70a
+</pre>
+
+<h2>Testing</h2>
+<p>You can test the individual components of this assignment using our testing framework. We use <a onclick="javascript:pageTracker._trackPageview('/outgoing/github.com');" href="https://github.com/google/googletest">GTest</a> for unit test cases.
+You can compile and run each test individually from the command-line:</p>
+<pre>
+cd build
+make b_plus_tree_concurrent_test
+./test/b_plus_tree_concurrent_test
+</pre>
+
+<p>In the b_plus_tree_concurrent_test, we will first test separately with insert/remove operations and then spawn threads that execute insert and remove  at the same time.</p>
+<pre>
+cd build
+make lock_manager_test
+./test/lock_manager_test
+</pre>
+
+<p><b>Important:</b> These tests are only a subset of the all the tests that we will use to evaluate and grade your project. You should write additional test cases on your own to check the complete functionality of your implementation.</p>
+<h2>Development Hints</h2>
+<p>Instead of using <code>printf</code> statements for debugging, use the <code>LOG_*</code> macros for logging information like this:
+<pre>
+LOG_INFO("# Leaf Page: %s", leaf_page-&gt;ToString().c_str());
+LOG_DEBUG("Fetching page %d", page_id);
+</pre></p>
+<p>To enable logging in your project, you will need to reconfigure it like this:
+<pre>
+cd build
+cmake -DCMAKE_BUILD_TYPE=DEBUG ..
+make
+</pre></p>
+<p>The different logging levels are defined in <tt class="filepath">src/include/common/logger.h</tt>. After enabling logging, the logging level defaults to <code>LOG_LEVEL_INFO</code>. Any logging method with a level that is equal to or higher than <code>LOG_LEVEL_INFO</code> (e.g., <code>LOG_INFO</code>, <code>LOG_WARN</code>, <code>LOG_ERROR</code>) will emit logging information.</p>
+<p>Using <a onclick="javascript:pageTracker._trackPageview('/outgoing/www.cplusplus.com');" href="http://www.cplusplus.com/reference/cassert/assert/">assert </a>to force check the correctness of your implementation. For example, when you try to delete a page, the <code>page_count</code> must be equal to 0. And when you try to unpin a page, the <code>page_count</code> must be larger than 0.</p>
+<p>Using a relatively small value of page size at the beginning test stage, it would be easier for you to check whether you have done the delete and insert in the correct way. You can change the page size in configuration file (<tt class="filepath">src/include/common/config.h</tt>).</p>
+<h1>Grading Rubric</h1>
+<p>Each project submission will be graded based on the following criteria:</p>
+<ol>
+<li>Does the submission successfully execute all of the test cases and produce the correct answer?</li>
+<li>Does the submission execute without any memory leaks?</li>
+</ol>
+<p>Note that we will use additional test cases that are more complex and go beyond the sample test cases that we provide you.</p>
+<h1>Late Policy</h1>
+<p>See the <a href="#late-policy">late policy</a> in the syllabus.</p>
+<h1>Submission</h1>
+<p>After completing the assignment, you can submit your implementation of to Autolab:</p>
+<ul>
+<li><a onclick="javascript:pageTracker._trackPageview('/outgoing/autolab.andrew.cmu.edu');" href="https://autolab.andrew.cmu.edu/courses/15445-f17">https://autolab.andrew.cmu.edu/courses/15445-f17</a>.</li>
+</ul>
+<p>You only need to include the following files:</p>
+<ul class="default">
+    <li> Every file for Project 1 (6 in total)
+    <li> Every file for Project 2 (10 in total)
+    <li> <tt class="filepath">src/concurrency/lock_manager.cpp</tt>
+    <li> <tt class="filepath">src/include/concurrency/lock_manager.h</tt>
+</ul>
+
+<p>You can submit your answers as many times as you like and get immediate feedback. Your score will be sent via email to your Andrew account within a few minutes after your submission.</p>
+<h1>Collaboration Policy</h1>
+<ul>
+<li>Every student has to work individually on this assignment.</li>
+<li>Students are allowed to discuss high-level details about the project with others.</li>
+<li>Students are <strong>not</strong> allowed to copy the contents of a white-board after a group meeting with other students.</li>
+<li>Students are <strong>not</strong> allowed to copy the solutions from another colleague.</li>
+</ul>
+<p class="warning bg-danger">
+    <i class="trigger fa fa-exclamation-triangle fa-lg"></i>
+    <b>WARNING:</b> All of the code for this project must be your own. You may not copy source code from other students or other sources that you find on the web. Plagiarism <b>will not</b> be tolerated. See CMU's <a onclick="javascript:pageTracker._trackPageview('/outgoing/www.cmu.edu');" href="http://www.cmu.edu/policies/documents/Academic%20Integrity.htm">Policy on Academic Integrity</a> for additional information.
+</p></p>
+                <div class="published">
+                    <time datetime="2017-10-26 15:39:26.119097-04:00"> <B>Last Updated:</B> Oct 26, 2017</time>
+                </div>
+            </section>
+        </div>
+    </section>
+</article>
+
+<!-- Footer -->
+<footer id="footer">
+
+    <ul class="icons">
+    </ul>
+    
+    <span class="copyright">
+    <a onclick="javascript:pageTracker._trackPageview('/outgoing/db.cs.cmu.edu');" href="http://db.cs.cmu.edu" title="Carnegie Mellon Database Group" class="image-link"><img src="../images/cmu-db-group.png"></a>
+    </span>
+
+</footer>    <!-- Google Analytics -->
+    <script type="text/javascript">
+
+        var _gaq = _gaq || [];
+        _gaq.push(['_setAccount', 'UA-4067813-24']);
+        _gaq.push(['_trackPageview']);
+
+        (function () {
+            var ga = document.createElement('script');
+            ga.type = 'text/javascript';
+            ga.async = true;
+            ga.src = ('https:' == document.location.protocol ? 'https://ssl' : 'http://www') + '.google-analytics.com/ga.js';
+            var s = document.getElementsByTagName('script')[0];
+            s.parentNode.insertBefore(ga, s);
+        })();
+    </script>
+    <!-- End Google Analytics Code -->
+
+</body>
+</html>

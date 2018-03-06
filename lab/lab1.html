@@ -1,0 +1,377 @@
+<!DOCTYPE html>
+<html lang="en"
+      xmlns:og="http://ogp.me/ns#"
+      xmlns:fb="https://www.facebook.com/2008/fbml">
+<head>
+    <meta http-equiv="content-type" content="text/html; charset=utf-8" />
+    <meta name="description" content="" />
+    <meta name="keywords" content="" />
+    <!--[if lte IE 8]><script src="../css/ie/html5shiv.js"></script><![endif]-->
+    <script src="../js/jquery.min.js"></script>
+    <script src="../js/jquery.dropotron.min.js"></script>
+    <script src="../js/skel.min.js"></script>
+    <script src="../js/skel-layers.min.js"></script>
+    <script src="../js/init.js"></script>
+    <link rel="stylesheet" href="../css/pygment.css" />
+    <noscript>
+        <link rel="stylesheet" href="../css/skel.css" />
+        <link rel="stylesheet" href="../css/style.css" />
+        <link rel="stylesheet" href="../css/style-noscript.css" />
+    </noscript>
+    <script src="//cdnjs.cloudflare.com/ajax/libs/modernizr/2.6.2/modernizr.min.js"></script>
+    <link href="http://netdna.bootstrapcdn.com/font-awesome/4.7.0/css/font-awesome.min.css" rel="stylesheet">
+    <link  href="http://fonts.googleapis.com/css?family=Anonymous+Pro:regular,italic,bold,bolditalic" rel="stylesheet" type="text/css" >
+    <!--[if lte IE 8]><link rel="stylesheet" href="/css/ie/v8.css" /><![endif]-->
+    <!--[if lte IE 9]><link rel="stylesheet" href="/css/ie/v9.css" /><![endif]-->
+    
+    
+    <meta property="og:site_name" content="CMU 15-445/645" />
+    <meta property="og:type" content="article"/>
+    <meta property="og:title" content="Project #1 - Buffer Pool - CMU 15-445/645 :: Intro to Database Systems (Fall 2017)"/>
+    <meta property="og:url" content="../project1/index.html"/>
+    <meta property="article:published_time" content="2017-09-11" />
+    <meta property="og:description" content="Overview During the semester, you will be building a new disk-oriented storage manager for the SQLite DBMS. Such a storage manager assumes that the primary storage location of the database is on disk. You will be using SQLite&#39;s Virtual Table interface; this will allow you use your storage manager in SQLite without changing application-level code. You do not need to know exactly how SQLite works to complete these assignments. The first programming project is to implement a buffer pool in your storage manager. The buffer pool is responsible for moving physical pages back and forth from main memory to disk …" />
+        <meta property="og:image"
+              content="http://15445.courses.cs.cmu.edu/fall2017/images/twitter-card.jpg"/>
+
+    <meta name="twitter:card" content="summary">
+        <meta name="twitter:site" content="@CMUDB">
+        <meta name="twitter:creator" content="@CMUDB">
+    <meta name="twitter:domain" content="..">
+            <meta property="twitter:image"
+                  content="http://15445.courses.cs.cmu.edu/fall2017/images/twitter-card.jpg"/>
+    
+    
+    <link href="http://db.cs.cmu.edu/favicon.png" rel="icon">
+
+    <title>Project #1 - Buffer Pool | CMU 15-445/645 :: Intro to Database Systems (Fall 2017) </title>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width">
+</head>
+
+<body class=" loading">
+
+    <!-- Header -->
+    <header id="header" >
+        <h1 class="logo">
+            <a href="..">CMU 15-445/645</a>
+        </h1>
+        <nav id="nav">
+            <ul>
+                <li ><a href="index.html">Home</a></li>
+                            <li><a href="../assignments.html">Assignments</a>
+                            <li><a href="../schedule.html">Schedule</a>
+                            <li><a href="../syllabus.html">Syllabus</a>
+                <!--
+                <li class="submenu">
+                    <a href="../">Blog</a>
+                    <ul>
+                    </ul>
+                </li>
+                -->
+                <li> <a title="Youtube" href="https://www.youtube.com/playlist?list=PLSE8ODhjZXjYutVzTeAds8xUt1rcmyT7x" target="_new"><i class="fa fa-youtube"></i> Youtube</a>
+                <li> <a title="Canvas" href="https://canvas.cmu.edu/courses/1678" target="_new"><i class="fa fa-comments-o"></i> Canvas</a>
+                
+            </ul>
+        </nav>
+    </header>
+
+<!-- Main -->
+<article id="main">
+
+    <header class="special container">
+        <span class="icon fa-database"></span>
+        <h2>Project #1 - Buffer Pool</h2>
+    </header>
+
+    <section class="wrapper style4 container">
+  
+        <!-- Content -->
+        <div class="content">
+            <section>
+                <p><!-- ========================================================================= -->
+
+<!-- OVERVIEW
+<!-- ========================================================================= -->
+
+<h1>Overview</h1>
+<p>During the semester, you will be building a new disk-oriented storage manager for the <a onclick="javascript:pageTracker._trackPageview('/outgoing/www.sqlite.org');" href="https://www.sqlite.org/">SQLite</a> DBMS. Such a storage manager assumes that the primary storage location of the database is on disk. You will be using SQLite's <a onclick="javascript:pageTracker._trackPageview('/outgoing/www.sqlite.org');" href="https://www.sqlite.org/vtab.html">Virtual Table</a> interface; this will allow you use your storage manager in SQLite without changing application-level code. You do not need to know exactly how SQLite works to complete these assignments.</p>
+<p>The first programming project is to implement a <b>buffer pool</b> in your storage manager. The buffer pool is responsible for moving physical pages back and forth from main memory to disk. It allows a DBMS to support databases that are larger than the amount of memory that is available to the system. Its operations are transparent to other parts in the system. For example, the system asks the buffer pool for a page using its unique identifier (<code>page_id</code>) and it does not know whether that page is already in memory or whether the system has to go retrieve it from disk.</p>
+<p>Your implementation will need to be thread-safe. Multiple threads will be accessing the internal data structures at the same and thus you need to make sure that their critical sections are protected with <a onclick="javascript:pageTracker._trackPageview('/outgoing/stackoverflow.com');" href="https://stackoverflow.com/a/42464336">latches</a> (these are called "locks" in operating systems).</p>
+<p>You will need to implement the following three components in your storage manager:</p>
+<ul class="default">
+    <li> <a href="#hash-table"><b>Extendible Hash Table</b></a>
+    <li> <a href="#replacer"><b>LRU Page Replacement Policy</b></a>
+    <li> <a href="#buffer-pool"><b>Buffer Pool Manager</b></a>
+</ul>
+
+<p>Although SQLite is written in C, all of the code in this programming assignment must be written in C++ (specifically C++11). We are providing you with the scaffolding to have your C++ code build and link with SQLite's virtual table API. If you have not used C++11 before, here is a <a onclick="javascript:pageTracker._trackPageview('/outgoing/www.thegeekstuff.com');" href="http://www.thegeekstuff.com/2016/02/c-plus-plus-11/">short tutorial</a> on the language. More detailed documentation of the language internals is available <a onclick="javascript:pageTracker._trackPageview('/outgoing/www.cplusplus.com');" href="http://www.cplusplus.com/doc/tutorial/">here</a></p>
+<p>This is a single-person project that will be completed individually (i.e., no groups).</p>
+<p class="warning bg-danger">
+    <i class="trigger fa fa-question-circle fa-lg"></i>
+    Please post all of your questions about this project on Canvas. Do <b>not</b> email the TAs directly with questions. The instructor and TAs will <b>not</b> teach you how to debug your code.
+</p>
+
+<!-- START project1 -->
+
+<!-- AUTO-GENERATED BY GENERATE-SCHEDULE SCRIPT -->
+
+<!-- ANY MODIFICATIONS WILL BE OVERWRITTEN -->
+
+<ul>
+<li><b>Release Date:</b> Sep 11, 2017</li>
+<li><b>Due Date:</b> Oct 02, 2017 @ 11:59pm
+<!-- END project1 --></li>
+</ul>
+<!-- ========================================================================= -->
+
+<!-- PROJECT SPECIFICATION
+<!-- ========================================================================= -->
+
+<h1>Project Specification</h1>
+<p>For each of the following components, we are providing you with stub classes that contain the API that you need to implement. You should <strong>not</strong> modify the signatures for the pre-defined functions in these classes. If you do this, then it will break the test code that we will use to grade your assignment you end up getting no credit for the project. You should also <strong>not</strong> add additional classes in the source code for these components. That is, they should be entirely self-contained. Again, this is necessary to ensure that your implementation is compatiable with our testing infrastructure.</p>
+<p>If a class already contains data members, you should <strong>not</strong> remove them. For example, the <code>BufferPoolManager</code> contains <code>DiskManager</code> and <code>Replacer</code> objects. These are required to implement the functionality that is needed by the rest of the system. You may need to add data members to these classes in order to correctly implement the required functionality.  You can also add additional helper functions to these classes. This choice is up to you.</p>
+<p>You are allowed to use any built-in <a onclick="javascript:pageTracker._trackPageview('/outgoing/en.cppreference.com');" href="http://en.cppreference.com/w/cpp/container">C++11 containers</a> in your project unless specified otherwise. It is up to you to decide which ones you want to use. Note that these containers are not thread-safe and that you will need to include latches in your implementation to protect them. You may not bring in additional third-party dependencies (e.g., boost).</p>
+<!-- **************************************************** -->
+
+<!-- Extendible Hash Table
+<!-- **************************************************** -->
+
+<h2 id="hash-table">Task #1 - Extendible Hash Table</h2>
+
+<p>For the first part of this project, you will build a general purpose hash table that uses unordered buckets to store unique key/value pairs. Your hash table must support the ability to insert/delete key/value entries without specifying the max size of the table. Your table needs to automatically grow in size as needed but you do not need shrink it. That is, you do not need to implement support for shrinking or compacting the hash table. You will also need to support checking to see whether a key exists in the hash table and return its corresponding value.</p>
+<p>You must implement your hash table in the designated files in the project source code. You are only allows to modify the hash table header file (<tt class="filepath">src/include/hash/extendible_hash.h</tt>) and its corresponding implementation file (<tt class="filepath">src/hash/extendible_hash.cpp</tt>). You do not need to modify any other files. You may <b>not</b> use another built-in hash table internally in your implementation. You must implement the following functions in the <code>ExtendibleHashTable</code> class:</p>
+<ul class="default">
+    <li><code>HashKey(K)</code>:
+    For the given key <tt>K</tt>, return the offset of the <tt>Bucket</tt> where it should be stored.
+
+    <li><code>Find(K, V)</code>:
+    For the given key <tt>K</tt>, check to see whether it exists in the hash table. If it does, then store the pointer to its corresponding value in <tt>V</tt> and return <tt>true</tt>. If the key does not exist, then return <tt>false</tt>.
+
+    <li><code>Insert(K, V)</code>:
+    Insert the key/value pair into the hash table. If the key <tt>K</tt> already exists, overwrite its value with the new value <tt>V</tt> and return <tt>true</tt>.
+
+    <li><code>Remove(K)</code>:
+    For the given key <tt>K</tt>, remove its corresponding key/value pair from the hash table and return <tt>true</tt>. If the key <tt>K</tt> does not exist in the hash table, then return <tt>false</tt>.
+
+    <li><code>GetGlobalDepth()</code>:
+    Return the current global depth of the entire hash table.
+
+    <li><code>GetLocalDepth(bucket_id)</code>:
+    Return the current local depth for the bucket at the given offset.
+
+    <li><code>GetNumBuckets()</code>:
+    Return the total number of buckets allocated in the hash table.
+</ul>
+
+<p>You need to make sure that all operations in the hash table are thread-safe using <a onclick="javascript:pageTracker._trackPageview('/outgoing/en.cppreference.com');" href="http://en.cppreference.com/w/cpp/thread/mutex">std::mutex</a>. It is up to you to decide how you want to protect the data structure.</p>
+<!-- **************************************************** -->
+
+<!-- LRU Page Replacement Policy
+<!-- **************************************************** -->
+
+<h2 id="replacer">Task #2 - LRU Page Replacement Policy</h2>
+
+<p>This component is responsible for tracking the usage of pages in the buffer pool. You will implement a new sub-class called <code>LRUReplacer</code> in <tt class="filepath">src/include/buffer/lru_replacer.h</tt> and its corresponding implementation file in <tt class="filepath">src/buffer/lru_replacer.cpp</tt>. This is a generic class that is used to keep track of when elements that it is tracking are used. You will need to implement the <em>least-recently used</em> policy discussed in the class and the textbook.</p>
+<p>Your new class will extend the abstract <code>Replacer</code> class (<tt class="filepath">src/include/buffer/replacer.h</tt>).  You will need to implement the following functions:</p>
+<ul class="default">
+    <li><code>Insert(T)</code>:
+    Mark the element <tt>T</tt> as having been accessed in the database. This means that the element is now the most frequently accessed and should not be selected as the victim for removal from the buffer pool (assuming there exists more than one element).
+
+    <li><code>Victim(T)</code>:
+    Remove the object that was accessed the least recently compared to all the elements being tracked by the <tt>Replacer</tt>, store its contents in the value <tt>T</tt>, and then return <tt>true</tt>. If there is only one element in the <tt>Replacer</tt>, then that is always considered to be the least recently used. If there are zero elements in the <tt>Replacer</tt>, then this function should return <tt>false</tt>.
+
+    <li><code>Erase(T)</code>:
+    Completely remove the element <tt>T</tt> from the <tt>Replacer</tt>'s internal tracking data structure regardless of where it appears in the LRU replacer. This should delete all tracking data from the element. If the element <tt>T</tt> exists and it was removed, then the function should return <tt>true</tt>. Otherwise, return <tt>false</tt>.
+
+    <li><code>Size()</code>:
+    Return the number of elements that this <tt>Replacer</tt> is tracking.
+</ul>
+
+<p>It is up to you to decide how you want to implement the data structures to store the meta-data about the elements inside of <code>LRUReplacer</code>. For example, you can use the <code>ExtendibleHashTable</code> that you built in the first task or use a built-in STL container. You do not need to worry about a maximun size of the data structures. You can assume that you will not run out of memory. Again, you need to make sure that the operations are thread-safe.</p>
+<!-- **************************************************** -->
+
+<!-- Buffer Pool Manager
+<!-- **************************************************** -->
+
+<h2 id="buffer-pool">Task #3 - Buffer Pool Manager</h2>
+
+<p>Lastly, you need to implement the buffer pool manager in your system (<code>BufferPoolManager</code>). It is responsible for fetching database pages from the <code>DiskManager</code> and storing them in memory. The <code>BufferPoolManager</code> can also write dirty pages out to disk when it is either explicitly instructed to do so or when it needs to evict a page to make space for a new page.</p>
+<p>To make sure that your implementation works correctly with the rest of the system, we will provide you with some of the functions already filled in. You will also not need to implement the code that actually reads and writes data to disk (this is called the <code>DiskManager</code> in our implementation). We will provide that functionality for you.</p>
+<p>All in-memory pages in the system are represented by <code>Page</code> objects. The <code>BufferPoolManager</code> does not need to understand the contents of these pages. But it is important for you as the system developer to understand that <code>Page</code> objects are just containers for memory in the buffer pool and thus are not specific to a unique page. That is, each <code>Page</code> object contains a block of memory that the <code>DiskManager</code> will use as a location to copy the contents of a <u>physical page</u> that it reads from disk. The <code>BufferPoolManager</code> will reuse the same <code>Page</code> object to store data as it moves back and forth to disk. This means that the same <code>Page</code> object may contain a different physical page throughout the life of the system. The <code>Page</code> object's identifer (<code>page_id</code>) keeps track of what physical page it contains; if a <code>Page</code> object does not contain a physical page, then its <code>page_id</code> must be set to <code>INVALID_PAGE_ID</code>.</p>
+<p>Each <code>Page</code> object also maintains a counter for the number of threads that have "pinned" that page. Your <code>BufferPoolManager</code> is not allowed to free a <code>Page</code> that is pinned. Each <code>Page</code> object also keeps track of whether it is dirty or not. It is your job to record whether a page was modified when it is unpinned. Your <code>BufferPoolManager</code> must write the contents  of a dirty <code>Page</code> back to disk before that object can be reused.</p>
+<p>Your <code>BufferPoolManager</code> implementation will use the <code>ExtendibleHashTable</code> and <code>LRUReplacer</code> classes that you created in the previous steps of this assignment. It will use the <code>ExtendibleHashTable</code> for the table that maps <code>page_id</code>'s to <code>Page</code> objects. It will also use the <code>LRUReplacer</code> to keep track of when <code>Page</code> objects are accessed so that it can decide which one to evict when it must free a frame to make room for copying a new physical page from disk.</p>
+<p>You will need to implement the following functions defined in the header file (<tt class="filepath">src/include/buffer/buffer_pool_manager.h</tt>) in the source file (<tt class="filepath">src/buffer/buffer_pool_manager.cpp</tt>):</p>
+<ul class="default">
+    <li><code>FetchPage(page_id)</code>:
+    This returns a <tt>Page</tt> object that contains the contents of the given <tt>page_id</tt>.
+    The function should first check its internal page table to see whether there already exists a <tt>Page</tt> that is mapped to the <tt>page_id</tt>. If it does, then it returns it. Otherwise it will retrieve the physical page from the <tt>DiskManager</tt>. To do this, the function needs to select a <tt>Page</tt> object to store the physical page's contents. If there are free frames in the page table, then the function will select a random one to use. Otherwise, it will use the <tt>LRUReplacer</tt> to select an <u>unpinned</u> <tt>Page</tt> that was least recently used as the "victim" page. If there are no free slots (i.e., all the pages are pinned), then return a null pointer (<tt>nullptr</tt>). If the selected victim page is dirty, then you will need to use the <tt>DiskManager</tt> to write its contents out to disk. You will then use the <tt>DiskManager</tt> to read the target physical page from disk and copy its contents into that <tt>Page</tt> object.<BR/>
+    <b>IMPORTANT:</b> This function must mark the <tt>Page</tt> as pinned and remove its entry from <tt>LRUReplacer</tt> <u>before</u> it is returned to the caller.
+
+    <li><code>NewPage(page_id)</code>:
+    Allocate a new physical page in the <tt>DiskManager</tt>, store the new page id in the given <tt>page_id</tt> and store the new page in the buffer pool. This should have the same functionality as <tt>FetchPage()</tt> in terms of selecting a victim page from <tt>LRUReplacer</tt> and initializing the <tt>Page</tt>'s internal meta-data (including incrementing the pin count).
+
+    <li><code>UnpinPage(page_id, is_dirty)</code>:
+    Decrement the pin counter for the <tt>Page</tt> specified by the given <tt>page_id</tt>. If the pin counter is zero, then the function will add the <tt>Page</tt> object into the <tt>LRUReplacer</tt> tracker. If the given <tt>is_dirty</tt> flag is <tt>true</tt>, then mark the <tt>Page</tt> as dirty; otherwise, leave the <tt>Page</tt>'s dirty flag unmodified. If there is no entry in the page table for the given <tt>page_id</tt>, then return <tt>false</tt>.
+
+    <li><code>FlushPage(page_id)</code>:
+    This will retrieve the <tt>Page</tt> object specified by the given <tt>page_id</tt> and then use the <tt>DiskManager</tt> to write its contents out to disk. Upon successful completion of that write operation, the function will return <tt>true</tt>. This function should not remove the <tt>Page</tt> from the buffer pool. It also does not need to update the <tt>LRUReplacer</tt> for the <tt>Page</tt>. If there is no entry in the page table for the given <tt>page_id</tt>, then return <tt>false</tt>.
+
+    <li><code>FlushAllPages()</code>:
+    For each <tt>Page</tt> object in the buffer pool, use the <tt>DiskManager</tt> to write their contens out to disk. This function should not remove the <tt>Page</tt> from the buffer pool. It also does not need to update the <tt>LRUReplacer</tt> for the <tt>Page</tt>.
+
+    <li><code>DeletePage(page_id)</code>:
+    Instruct the <tt>DiskManager</tt> to deallocate the physical page identified by the given <tt>page_id</tt>. You can only delete a page if it is currently unpinned.
+</ul>
+
+<!-- ========================================================================= -->
+
+<!-- INSTRUCTIONS
+<!-- ========================================================================= -->
+
+<h1>Instructions</h1>
+<h2>Setting Up Your Development Environment</h2>
+<p>Download the project source code <a onclick="javascript:pageTracker._trackPageview('/downloads/{filename}/files/sqlite-fall2017.tar.gz');" href="{filename}/files/sqlite-fall2017.tar.gz">here</a>. Unpack the tarball on your development machine:</p>
+<pre>
+$ tar zxfv sqlite-fall2017.tar.gz
+</pre>
+
+<p>To build the system from the commandline, execute the following commands:</p>
+<pre>
+$ mkdir build
+$ cd build
+$ cmake ..
+$ make
+</pre>
+
+<p>To speed up the build process, you can use multiple threads by passing the <code>-j</code> flag to make. For example, the following command will build the system using four threads:</p>
+<pre>
+$ make -j 4
+</pre>
+
+<h2>Testing</h2>
+<p>You can test the individual components of this assigment using our testing framework. We use <a onclick="javascript:pageTracker._trackPageview('/outgoing/github.com');" href="https://github.com/google/googletest">GTest</a> for unit test cases. There are three separate files that contain tests for each component:</p>
+<ul class="default">
+    <li><code>ExtendibleHashTable</code>: <tt class="filepath">test/hash/extendible_hash_test.cpp</tt>
+
+    <li><code>LRUReplacer</code>: <tt class="filepath">test/buffer/lru_replacer_test.cpp</tt>
+
+    <li><code>BufferPoolManager</code>: <tt class="filepath">test/buffer/buffer_pool_manager_test.cpp</tt>
+</ul>
+
+<p>You can compile and run each test individually from the command-line:</p>
+<pre>
+$ mkdir build
+$ cd build
+$ make extendible_hash_test
+$ ./test/extendible_hash_test
+</pre>
+
+<p>Do not run <code>make check</code> because this will try compile and run all of the test cases. This will fail because you have not implemented the next assigments yet.</p>
+<p><b>Important:</b> These tests are only a subset of the all the tests that we will use to evaluate and grade your project. You should write additional test cases on your own to check the complete functionality of your implementation.</p>
+<h2>Development Hints</h2>
+<p>Instead of using <code>printf</code> statements for debugging, use the <code>LOG_*</code> macros for logging information like this:
+<pre>LOG_INFO("# Pages: %d", num_pages);
+LOG_DEBUG("Fetching page %d", page_id);</pre></p>
+<p>To enable logging in your project, you will need to reconfigure it like this:
+<pre>
+$ mkdir build
+$ cd build
+$ cmake -DCMAKE_BUILD_TYPE=DEBUG ..
+$ make</pre></p>
+<p>The different logging levels are defined in <tt class="filepath">src/include/common/logger.h</tt>. After enabling logging, the logging level defaults to <code>LOG_LEVEL_INFO</code>. Any logging method with a level that is equal to or higher than <code>LOG_LEVEL_INFO</code> (e.g., <code>LOG_INFO</code>, <code>LOG_WARN</code>, <code>LOG_ERROR</code>) will emit logging information. Note that you will need to add <code>#include "common/logger.h"</code> to any file that you want to use the logging infrastructure.</p>
+<p>We encourage you to use <code>gdb</code> to debug your project if you are having problems. There are many tutorials and walkthroughs available to teach you how to use <code>gdb</code> effectively. Here are some that we have found useful:</p>
+<ul>
+<li><a onclick="javascript:pageTracker._trackPageview('/outgoing/www.cs.cmu.edu');" href="https://www.cs.cmu.edu/~gilpin/tutorial/">Debugging Under Unix: gdb Tutorial</a></li>
+<li><a onclick="javascript:pageTracker._trackPageview('/outgoing/www.techbeamers.com');" href="http://www.techbeamers.com/how-to-use-gdb-top-debugging-tips/">GDB Tutorial: Advanced Debugging Tips For C/C++ Programmers</a></li>
+<li><a onclick="javascript:pageTracker._trackPageview('/outgoing/www.youtube.com');" href="https://www.youtube.com/watch?v=PorfLSr3DDI">Give me 15 minutes &amp; I'll change your view of GDB</a> [VIDEO]</li>
+</ul>
+<!-- ========================================================================= -->
+
+<!-- GRADING RUBRIC
+<!-- ========================================================================= -->
+
+<h1>Grading Rubric</h1>
+<p>Each project submission will be graded based on the following criteria:</p>
+<ol>
+<li>Does the submission successfully execute all of the test cases and produce the correct answer?</li>
+<li>Does the submission execute without any memory leaks?</li>
+</ol>
+<p>Note that we will use additional test cases that are more complex and go beyond the sample test cases that we provide you.</p>
+<!-- ========================================================================= -->
+
+<!-- LATE POLICY
+<!-- ========================================================================= -->
+
+<h1>Late Policy</h1>
+<p>See the <a href="#late-policy">late policy</a> in the syllabus.</p>
+<h1>Submission</h1>
+<p>After completing the assignment, you can submit your implementation of to Autolab:</p>
+<ul>
+<li><a onclick="javascript:pageTracker._trackPageview('/outgoing/autolab.andrew.cmu.edu');" href="https://autolab.andrew.cmu.edu/courses/15445-f17">https://autolab.andrew.cmu.edu/courses/15445-f17</a>.</li>
+</ul>
+<p>You only need to include the following files:</p>
+<ul class="default">
+    <li> <tt class="filepath">src/include/hash/extendible_hash.h</tt>
+    <li> <tt class="filepath">src/hash/extendible_hash.cp</tt>
+    <li> <tt class="filepath">src/include/buffer/lru_replacer.h</tt>
+    <li> <tt class="filepath">src/buffer/lru_replacer.cpp</tt>
+    <li> <tt class="filepath">src/include/buffer/buffer_pool_manager.h</tt>
+    <li> <tt class="filepath">src/buffer/buffer_pool_manager.cpp</tt>
+</ul>
+
+<p>You can submit your answers as many times as you like and get immediate feedback. Your score will be sent via email to your Andrew account within a few minutes after your submission.</p>
+<!-- ========================================================================= -->
+
+<!-- COLLABORATION POLICY
+<!-- ========================================================================= -->
+
+<h1>Collaboration Policy</h1>
+<ul>
+<li>Every student has to work individually on this assignment.</li>
+<li>Students are allowed to discuss high-level details about the project with others.</li>
+<li>Students are <strong>not</strong> allowed to copy the contents of a white-board after a group meeting with other students.</li>
+<li>Students are <strong>not</strong> allowed to copy the solutions from another colleague.</li>
+</ul>
+<p class="warning bg-danger">
+    <i class="trigger fa fa-exclamation-triangle fa-lg"></i>
+    <b>WARNING:</b> All of the code for this project must be your own. You may not copy source code from other students or other sources that you find on the web. Plagiarism <b>will not</b> be tolerated. See CMU's <a onclick="javascript:pageTracker._trackPageview('/outgoing/www.cmu.edu');" href="http://www.cmu.edu/policies/documents/Academic%20Integrity.htm">Policy on Academic Integrity</a> for additional information.
+</p></p>
+                <div class="published">
+                    <time datetime="2017-09-11 10:43:48.933482-04:00"> <B>Last Updated:</B> Sep 11, 2017</time>
+                </div>
+            </section>
+        </div>
+    </section>
+</article>
+
+<!-- Footer -->
+<footer id="footer">
+
+    <ul class="icons">
+    </ul>
+    
+    <span class="copyright">
+    <a onclick="javascript:pageTracker._trackPageview('/outgoing/db.cs.cmu.edu');" href="http://db.cs.cmu.edu" title="Carnegie Mellon Database Group" class="image-link"><img src="../images/cmu-db-group.png"></a>
+    </span>
+
+</footer>    <!-- Google Analytics -->
+    <script type="text/javascript">
+
+        var _gaq = _gaq || [];
+        _gaq.push(['_setAccount', 'UA-4067813-24']);
+        _gaq.push(['_trackPageview']);
+
+        (function () {
+            var ga = document.createElement('script');
+            ga.type = 'text/javascript';
+            ga.async = true;
+            ga.src = ('https:' == document.location.protocol ? 'https://ssl' : 'http://www') + '.google-analytics.com/ga.js';
+            var s = document.getElementsByTagName('script')[0];
+            s.parentNode.insertBefore(ga, s);
+        })();
+    </script>
+    <!-- End Google Analytics Code -->
+
+</body>
+</html>
