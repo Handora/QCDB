@@ -12,6 +12,9 @@
 #include <cstdlib>
 #include <vector>
 #include <string>
+#include <utility>
+#include <memory>
+#include <mutex>
 
 #include "hash/hash_table.h"
 
@@ -34,9 +37,23 @@ namespace cmudb {
     void Insert(const K &key, const V &value) override;
     
   private:
-  // add your own member variables here
+    // add your own member variables here 
+    struct Bucket {
+      int local_depth_;
+      std::mutex local_latch_;
+      std::vector<std::pair<K, V>>  kv_records_;
+      Bucket(int local_depth) {
+	this->local_depth_ = local_depth;
+	this->kv_records_ = {};
+      }
+    };
     size_t size_;
     int global_depth_ = 0;
-    int num_buckets = 0; 
+    int num_buckets_ = 1;
+    std::vector<std::shared_ptr<Bucket>> bucket_address_table_;
+
+    // latches
+    mutable std::mutex global_depth_latch_;
+    mutable std::mutex global_num_buckets_latch_; 
   };
 } // namespace cmudb

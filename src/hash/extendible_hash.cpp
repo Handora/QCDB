@@ -2,6 +2,9 @@
 
 #include "hash/extendible_hash.h"
 #include "page/page.h"
+#include "common/logger.h"
+#include <functional>
+#include <cassert>
 
 namespace cmudb {
 
@@ -10,9 +13,8 @@ namespace cmudb {
  * array_size: fixed array size for each bucket
  */
 template <typename K, typename V>
-ExtendibleHash<K, V>::ExtendibleHash(size_t size) {
-  this->size_ = size;
-  
+ExtendibleHash<K, V>::ExtendibleHash(size_t size): size_(size) {
+  bucket_address_table_.push_back(std::make_shared<Bucket>(0));
 }
 
 /*
@@ -20,7 +22,7 @@ ExtendibleHash<K, V>::ExtendibleHash(size_t size) {
  */
 template <typename K, typename V>
 size_t ExtendibleHash<K, V>::HashKey(const K &key) {
-  return 0;
+  return std::hash<K>{}(key) % (1 << global_depth_);
 }
 
 /*
@@ -29,7 +31,9 @@ size_t ExtendibleHash<K, V>::HashKey(const K &key) {
  */
 template <typename K, typename V>
 int ExtendibleHash<K, V>::GetGlobalDepth() const {
-  return 0;
+  // fro RAII style mutex
+  std::lock_guard<std::mutex> latch(global_depth_latch_);
+  return global_depth_;
 }
   
 /*
@@ -38,7 +42,13 @@ int ExtendibleHash<K, V>::GetGlobalDepth() const {
  */
 template <typename K, typename V>
 int ExtendibleHash<K, V>::GetLocalDepth(int bucket_id) const {
-  return 0;
+  assert(bucket_id < (1 << global_depth_));
+  assert(bucket_id >= 0);
+  std::shared_ptr<Bucket> bucket = bucket_address_table_[bucket_id];
+  assert(bucket != nullptr);
+
+  std::lock_guard<std::mutex> latch(bucket->local_latch_);
+  return bucket->local_depth_;
 }
   
 /*
@@ -46,6 +56,7 @@ int ExtendibleHash<K, V>::GetLocalDepth(int bucket_id) const {
  */
 template <typename K, typename V>
 int ExtendibleHash<K, V>::GetNumBuckets() const {
+  std::lock_guard<std::mutex> latch(global_num_buckets_latch_);
   return 0;
 }
 
@@ -54,6 +65,12 @@ int ExtendibleHash<K, V>::GetNumBuckets() const {
  */
 template <typename K, typename V>
 bool ExtendibleHash<K, V>::Find(const K &key, V &value) {
+  size_t bucket_id = HashKey(key);
+  assert(bucket_id < (1 << global_depth_));
+  assert(bucket_id >= 0);
+  std::shared_ptr<Bucket> bucket = bucket_address_table_[bucket_id];
+  assert(bucket != nullptr);  
+
   return false;
 }
   
@@ -65,7 +82,6 @@ template <typename K, typename V>
 bool ExtendibleHash<K, V>::Remove(const K &key) {
   return false;
 }
-  
 
 /*
  * insert <key,value> entry in hash table
