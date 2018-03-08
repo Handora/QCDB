@@ -5,6 +5,7 @@
 #include "common/logger.h"
 #include <functional>
 #include <cassert>
+#include <algorithm>
 
 namespace cmudb {
 
@@ -71,7 +72,14 @@ bool ExtendibleHash<K, V>::Find(const K &key, V &value) {
   std::shared_ptr<Bucket> bucket = bucket_address_table_[bucket_id];
   assert(bucket != nullptr);  
 
-  return false;
+  auto it = std::find(bucket->kv_records_.begin(), bucket->kv_records_.end(), std::make_pair(key, value));
+  
+  if (it != bucket->kv_records_.end()) {
+    it->second = value;
+    return true;
+  } else {
+    return false;
+  }
 }
   
 /*
@@ -80,6 +88,20 @@ bool ExtendibleHash<K, V>::Find(const K &key, V &value) {
  */
 template <typename K, typename V>
 bool ExtendibleHash<K, V>::Remove(const K &key) {
+  size_t bucket_id = HashKey(key);
+  assert(bucket_id < (1 << global_depth_));
+  assert(bucket_id >= 0);
+  std::shared_ptr<Bucket> bucket = bucket_address_table_[bucket_id];
+  if (bucket != nullptr) {
+    auto origin_size = bucket->kv_records_.size();
+    remove_if(bucket->kv_records_.begin(),
+		bucket->kv_records_.end(),
+	      [&](const std::pair<K, V>& record) {
+		return record.first == key;
+	      });
+    return origin_size == bucket->kv_records_.size();
+  }
+
   return false;
 }
 
@@ -89,7 +111,9 @@ bool ExtendibleHash<K, V>::Remove(const K &key) {
  * global depth
  */
 template <typename K, typename V>
-void ExtendibleHash<K, V>::Insert(const K &key, const V &value) {}
+void ExtendibleHash<K, V>::Insert(const K &key, const V &value) {
+  
+}
 
 template class ExtendibleHash<page_id_t, Page *>;
 template class ExtendibleHash<Page *, std::list<Page *>::iterator>;
