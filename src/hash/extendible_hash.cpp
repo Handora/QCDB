@@ -6,6 +6,7 @@
 #include <functional>
 #include <cassert>
 #include <algorithm>
+#include <condition_variable>
 
 namespace cmudb {
 
@@ -15,7 +16,9 @@ namespace cmudb {
  */
 template <typename K, typename V>
 ExtendibleHash<K, V>::ExtendibleHash(size_t size): size_(size) {
+  std::mutex latch;
   bucket_address_table_.push_back(std::make_shared<Bucket>(0));
+  bucket_latch_table_.push_back(latch); 
 }
 
 /*
@@ -23,7 +26,7 @@ ExtendibleHash<K, V>::ExtendibleHash(size_t size): size_(size) {
  */
 template <typename K, typename V>
 size_t ExtendibleHash<K, V>::HashKey(const K &key) {
-  return std::hash<K>{}(key) % (1 << global_depth_);
+  return std::hash<K>{}(key) % (1 << GetGlobalDepth());
 }
 
 /*
@@ -32,7 +35,7 @@ size_t ExtendibleHash<K, V>::HashKey(const K &key) {
  */
 template <typename K, typename V>
 int ExtendibleHash<K, V>::GetGlobalDepth() const {
-  // fro RAII style mutex
+  // for RAII style mutex
   std::lock_guard<std::mutex> latch(global_depth_latch_);
   return global_depth_;
 }
@@ -45,10 +48,10 @@ template <typename K, typename V>
 int ExtendibleHash<K, V>::GetLocalDepth(int bucket_id) const {
   assert(bucket_id < (1 << global_depth_));
   assert(bucket_id >= 0);
+  std::lock_guard<std::mutex> latch(bucket_latch_table_[bucket_id]);
   std::shared_ptr<Bucket> bucket = bucket_address_table_[bucket_id];
   assert(bucket != nullptr);
-
-  std::lock_guard<std::mutex> latch(bucket->local_latch_);
+  
   return bucket->local_depth_;
 }
   
@@ -58,7 +61,7 @@ int ExtendibleHash<K, V>::GetLocalDepth(int bucket_id) const {
 template <typename K, typename V>
 int ExtendibleHash<K, V>::GetNumBuckets() const {
   std::lock_guard<std::mutex> latch(global_num_buckets_latch_);
-  return 0;
+  return num_buckets_;
 }
 
 /*
@@ -66,20 +69,31 @@ int ExtendibleHash<K, V>::GetNumBuckets() const {
  */
 template <typename K, typename V>
 bool ExtendibleHash<K, V>::Find(const K &key, V &value) {
-  size_t bucket_id = HashKey(key);
-  assert(bucket_id < (1 << global_depth_));
-  assert(bucket_id >= 0);
-  std::shared_ptr<Bucket> bucket = bucket_address_table_[bucket_id];
-  assert(bucket != nullptr);  
-
-  auto it = std::find(bucket->kv_records_.begin(), bucket->kv_records_.end(), std::make_pair(key, value));
+  size_t bucket_id;
+  do {
+    bucket_id = HashKey(key);
+    
+    assert(bucket_id < (1 << GetGlobalDepth()));
+    assert(bucket_id >= 0);
+    
+    
+    std::unique_lock<std::mutex> latch(bucket_latch_table_[bucket_id], std::try_to_lock);
+    if (!latch.owns_lock()) {
+      condition_.wait(latch);
+      continue;
+    }
+    std::shared_ptr<Bucket> bucket = bucket_address_table_[bucket_id];
+    assert(bucket != nullptr); 
+    
+    auto it = std::find(bucket->kv_records_.begin(), bucket->kv_records_.end(), std::make_pair(key, value));
   
-  if (it != bucket->kv_records_.end()) {
-    it->second = value;
-    return true;
-  } else {
-    return false;
-  }
+    if (it != bucket->kv_records_.end()) {
+      it->second = value;
+      return true;
+    } else {
+      return false;
+    } 
+  } while(false);
 }
   
 /*
@@ -88,25 +102,34 @@ bool ExtendibleHash<K, V>::Find(const K &key, V &value) {
  */
 template <typename K, typename V>
 bool ExtendibleHash<K, V>::Remove(const K &key) {
-  size_t bucket_id = HashKey(key);
-  assert(bucket_id < (1 << global_depth_));
-  assert(bucket_id >= 0);
-  std::shared_ptr<Bucket> bucket = bucket_address_table_[bucket_id];
-  if (bucket != nullptr) {
-    auto origin_size = bucket->kv_records_.size();
-    remove_if(bucket->kv_records_.begin(),
-		bucket->kv_records_.end(),
-	      [&](const std::pair<K, V>& record) {
-		return record.first == key;
-	      });
-    return origin_size == bucket->kv_records_.size();
-  }
+  do {
+    size_t bucket_id = HashKey(key);
+    assert(bucket_id < (1 << global_depth_));
+    assert(bucket_id >= 0);
 
-  return false;
+    std::unique_lock<std::mutex> latch(bucket_latch_table_[bucket_id], std::try_to_lock);
+    if (!latch.owns_lock()) {
+      condition_.wait(latch);
+      continue;
+    }
+    
+    std::shared_ptr<Bucket> bucket = bucket_address_table_[bucket_id];
+    if (bucket != nullptr) {
+      auto origin_size = bucket->kv_records_.size();
+      remove_if(bucket->kv_records_.begin(),
+		bucket->kv_records_.end(),
+		[&](const std::pair<K, V>& record) {
+		  return record.first == key;
+		});
+      return origin_size == bucket->kv_records_.size();
+    }
+
+    return false;
+  } while(false);
 }
 
 /*
- * insert <key,value> entry in hash table
+ * inserpppt <key,value> entry in hash table
  * Split & Redistribute bucket when there is overflow and if necessary increase
  * global depth
  */

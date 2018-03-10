@@ -39,8 +39,7 @@ namespace cmudb {
   private:
     // add your own member variables here 
     struct Bucket {
-      int local_depth_;
-      std::mutex local_latch_;
+      int local_depth_; 
       std::vector<std::pair<K, V>>  kv_records_;
       Bucket(int local_depth) {
 	this->local_depth_ = local_depth;
@@ -52,8 +51,10 @@ namespace cmudb {
     int num_buckets_ = 1;
     std::vector<std::shared_ptr<Bucket>> bucket_address_table_;
 
-    // latches
+    // latches 
     mutable std::mutex global_depth_latch_;
-    mutable std::mutex global_num_buckets_latch_; 
+    mutable std::mutex global_num_buckets_latch_;
+    mutable std::vector<std::mutex> bucket_latch_table_;
+    std::condition_variable condition_;
   };
 } // namespace cmudb
