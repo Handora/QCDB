@@ -15,7 +15,7 @@ TEST(ExtendibleHashTest, SampleTest) {
       new ExtendibleHash<int, std::string>(2);
 
   // insert several key/value pairs
-  test->Insert(1, "a");
+  test->Insert(1, "a"); 
   test->Insert(2, "b");
   test->Insert(3, "c");
   test->Insert(4, "d");
@@ -24,7 +24,6 @@ TEST(ExtendibleHashTest, SampleTest) {
   test->Insert(7, "g");
   test->Insert(8, "h");
   test->Insert(9, "i");
-  test->Speak(0);
   EXPECT_EQ(2, test->GetLocalDepth(0));
   EXPECT_EQ(3, test->GetLocalDepth(1));
   EXPECT_EQ(2, test->GetLocalDepth(2));
@@ -40,8 +39,8 @@ TEST(ExtendibleHashTest, SampleTest) {
   EXPECT_EQ("b", result);
   EXPECT_EQ(0, test->Find(10, result));
 
-  // delete test
-  EXPECT_EQ(1, test->Remove(8));
+  // delete test 
+  EXPECT_EQ(1, test->Remove(8)); 
   EXPECT_EQ(1, test->Remove(4));
   EXPECT_EQ(1, test->Remove(1));
   EXPECT_EQ(0, test->Remove(20));
@@ -81,14 +80,15 @@ TEST(ExtendibleHashTest, ConcurrentRemoveTest) {
     std::vector<std::thread> threads;
     std::vector<int> values{0, 10, 16, 32, 64};
     for (int value : values) {
-      test->Insert(value, value);
+      test->Insert(value, value); 
     }
+    
     EXPECT_EQ(test->GetGlobalDepth(), 6);
     for (int tid = 0; tid < num_threads; tid++) {
       threads.push_back(std::thread([tid, &test, &values]() {
-        test->Remove(values[tid]);
-        test->Insert(tid + 4, tid + 4);
-      }));
+	    test->Remove(values[tid]);
+	    test->Insert(tid + 4, tid + 4);
+	  }));
     }
     for (int i = 0; i < num_threads; i++) {
       threads[i].join();

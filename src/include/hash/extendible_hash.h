@@ -36,6 +36,7 @@ namespace cmudb {
     bool Remove(const K &key) override;
     void Insert(const K &key, const V &value) override;
     void Speak(int bucket_id) const;
+    void SpeakAll() const;
     
   private:
     // add your own member variables here 
