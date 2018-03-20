@@ -11,6 +11,9 @@
 
 #include "buffer/replacer.h"
 #include "hash/extendible_hash.h"
+#include <list>
+#include <iterator>
+#include <mutex>
 
 namespace cmudb {
 
@@ -31,6 +34,10 @@ public:
 
 private:
   // add your member variables here
+  std::ExtendibleHash<T, std::list<T>::iterator lru_key_itr_map_;
+  std::list<T> lru_list_;
+
+  std::mutex lru_replacer_latch_;
 };
 
 } // namespace cmudb
