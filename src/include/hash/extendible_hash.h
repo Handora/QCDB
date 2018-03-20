@@ -35,6 +35,7 @@ namespace cmudb {
     bool Find(const K &key, V &value) override;
     bool Remove(const K &key) override;
     void Insert(const K &key, const V &value) override;
+    void Speak(int bucket_id) const;
     
   private:
     // add your own member variables here 
@@ -51,10 +52,14 @@ namespace cmudb {
     int num_buckets_ = 1;
     std::vector<std::shared_ptr<Bucket>> bucket_address_table_;
 
-    // latches 
-    mutable std::mutex global_depth_latch_;
-    mutable std::mutex global_num_buckets_latch_;
-    mutable std::vector<std::mutex> bucket_latch_table_;
-    std::condition_variable condition_;
+    // latches
+    // TODO:
+    //    use finer granularity(such as per buckets per locks)
+    /* mutable std::mutex global_depth_latch_; */
+    /* mutable std::mutex global_num_buckets_latch_; */
+    /* mutable std::vector<std::mutex> bucket_latch_table_; */
+    /* std::condition_variable condition_; */
+
+    mutable std::mutex global_table_lock_;
   };
 } // namespace cmudb
