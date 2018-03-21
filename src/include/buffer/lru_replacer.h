@@ -14,6 +14,7 @@
 #include <list>
 #include <iterator>
 #include <mutex>
+#include <unordered_map>
 
 namespace cmudb {
 
@@ -34,7 +35,7 @@ public:
 
 private:
   // add your member variables here
-  std::ExtendibleHash<T, std::list<T>::iterator lru_key_itr_map_;
+  std::unordered_map<T, typename std::list<T>::iterator> lru_key_itr_map_;
   std::list<T> lru_list_;
 
   std::mutex lru_replacer_latch_;
