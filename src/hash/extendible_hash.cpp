@@ -1,5 +1,3 @@
-#include <list>
-
 #include "hash/extendible_hash.h"
 #include "page/page.h"
 #include "common/logger.h"
@@ -8,9 +6,9 @@
 #include <algorithm>
 #include <utility>
 #include <iterator>
+#include <list>
 
 namespace cmudb {
-
   /*
    * constructor
    * array_size: fixed array size for each bucket
