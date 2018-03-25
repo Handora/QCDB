@@ -47,8 +47,7 @@ BufferPoolManager::~BufferPoolManager() {
  * pointer
  */
 Page *BufferPoolManager::FetchPage(page_id_t page_id) {
-  if (page_id == INVALID_PAGE_ID)
-    return nullptr;
+  assert(page_id != INVALID_PAGE_ID);
   std::lock_guard<std::mutex> latch(latch_);
   Page* page = nullptr;
   bool ok = page_table_->Find(page_id, page);
@@ -92,8 +91,7 @@ Page *BufferPoolManager::FetchPage(page_id_t page_id) {
  * dirty flag of this page
  */
 bool BufferPoolManager::UnpinPage(page_id_t page_id, bool is_dirty) {
-  if (page_id == INVALID_PAGE_ID)
-    return false;
+  assert(page_id != INVALID_PAGE_ID);
   std::lock_guard<std::mutex> latch(latch_);
   Page *page = nullptr;
   bool ok = page_table_->Find(page_id, page);
@@ -116,8 +114,7 @@ bool BufferPoolManager::UnpinPage(page_id_t page_id, bool is_dirty) {
  * NOTE: make sure page_id != INVALID_PAGE_ID
  */
 bool BufferPoolManager::FlushPage(page_id_t page_id) {
-  if (page_id == INVALID_PAGE_ID)
-    return false;
+  assert(page_id != INVALID_PAGE_ID);
   std::lock_guard<std::mutex> latch(latch_);
   Page *page = nullptr;
   bool ok = page_table_->Find(page_id, page);
@@ -138,8 +135,7 @@ bool BufferPoolManager::FlushPage(page_id_t page_id) {
  * the page is found within page table, but pin_count != 0, return false
  */
 bool BufferPoolManager::DeletePage(page_id_t page_id) {
-  if (page_id == INVALID_PAGE_ID)
-    return false;
+  assert(page_id != INVALID_PAGE_ID);
   std::lock_guard<std::mutex> latch(latch_);
   Page *page = nullptr;
   bool ok = page_table_->Find(page_id, page);
@@ -192,7 +188,8 @@ Page *BufferPoolManager::NewPage(page_id_t &page_id) {
   page->is_dirty_ = true; 
   page->pin_count_ = 1;
   page->page_id_ = page_id; 
-  page_table_->Insert(page_id, page); 
+  page_table_->Insert(page_id, page);
+  memset(page->data_, 0, PAGE_SIZE);
   return page;
 }
 } // namespace cmudb
