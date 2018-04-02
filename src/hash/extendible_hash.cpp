@@ -47,7 +47,7 @@ namespace cmudb {
     assert(bucket_id < (1 << global_depth_));
     assert(bucket_id >= 0);
   
-    std::lock_guard<std::mutex> latch(global_table_lock_);
+    std::lock_guard<std::mutex> latch(global_table_lock_); 
     std::shared_ptr<Bucket> bucket = bucket_address_table_[bucket_id];
     assert(bucket != nullptr);
   
