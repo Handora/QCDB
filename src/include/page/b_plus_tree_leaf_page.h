@@ -29,7 +29,7 @@ namespace cmudb {
   BPlusTreeLeafPage<KeyType, ValueType, KeyComparator>
 
 INDEX_TEMPLATE_ARGUMENTS
-class BPlusTreeLeafPage : public BPlusTreePage {
+  class BPlusTreeLeafPage : public BPlusTreePage {
 
 public:
   // After creating a new leaf page from buffer pool, must call initialize

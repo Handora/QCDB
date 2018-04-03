@@ -33,6 +33,7 @@ INDEX_TEMPLATE_ARGUMENTS
 KeyType B_PLUS_TREE_INTERNAL_PAGE_TYPE::KeyAt(int index) const {
   // because the key array in the internalnode is not full
   assert(index > 0 && index < GetMaxSize());
+  
   KeyType key = array[index].first;
   return key;
 }
@@ -41,6 +42,7 @@ INDEX_TEMPLATE_ARGUMENTS
 void B_PLUS_TREE_INTERNAL_PAGE_TYPE::SetKeyAt(int index, const KeyType &key) {
   // because the key array in the internalnode is not full
   assert(index > 0 && index < GetMaxSize());
+  
   array[index].first = key;
 }
 
@@ -64,8 +66,8 @@ int B_PLUS_TREE_INTERNAL_PAGE_TYPE::ValueIndex(const ValueType &value) const {
  */
 INDEX_TEMPLATE_ARGUMENTS
 ValueType B_PLUS_TREE_INTERNAL_PAGE_TYPE::ValueAt(int index) const {
-  // because the key array in the internalnode is not full
-  assert(index > 0 && index < GetMaxSize());
+  // value index can start with 0
+  assert(index >= 0 && index < GetMaxSize());
   return array[index].second;
 }
 
@@ -81,6 +83,7 @@ INDEX_TEMPLATE_ARGUMENTS
 ValueType
 B_PLUS_TREE_INTERNAL_PAGE_TYPE::Lookup(const KeyType &key,
                                        const KeyComparator &comparator) const {
+  
   for (int i = 1; i < GetSize(); ++i) {
     if (comparator(key, array[i].first) <= 0) {
       return array[i-1].second;
@@ -103,8 +106,6 @@ B_PLUS_TREE_INTERNAL_PAGE_TYPE::Lookup(const KeyType &key,
     const ValueType &old_value, const KeyType &new_key,
     const ValueType &new_value) {
     SetSize(2);
-    // TODO
-    //   Deal with Invalid key
     array[0] = std::make_pair(new_key, old_value);
     array[1] = std::make_pair(new_key, new_value); 
   }
@@ -118,6 +119,7 @@ B_PLUS_TREE_INTERNAL_PAGE_TYPE::Lookup(const KeyType &key,
     const ValueType &old_value, const KeyType &new_key,
     const ValueType &new_value) {
     assert(GetSize() < GetMaxSize());
+    
     int old_index = ValueIndex(old_value);
     assert(old_index != -1);
     // use memmove for overlapping area
@@ -138,6 +140,7 @@ B_PLUS_TREE_INTERNAL_PAGE_TYPE::Lookup(const KeyType &key,
   void B_PLUS_TREE_INTERNAL_PAGE_TYPE::MoveHalfTo(
     BPlusTreeInternalPage *recipient,
     BufferPoolManager *buffer_pool_manager) {
+    
     int origin_size = GetSize();
     SetSize(GetSize()/2); 
     recipient->CopyHalfFrom(array+GetSize(), origin_size-GetSize(), buffer_pool_manager); 
@@ -191,6 +194,7 @@ B_PLUS_TREE_INTERNAL_PAGE_TYPE::Lookup(const KeyType &key,
   void B_PLUS_TREE_INTERNAL_PAGE_TYPE::MoveAllTo(
     BPlusTreeInternalPage *recipient, int index_in_parent,
     BufferPoolManager *buffer_pool_manager) {
+    
     page_id_t parent_id = GetParentPageId();
     assert(parent_id == recipient->GetParentPageId());
     assert(parent_id != INVALID_PAGE_ID);
@@ -245,8 +249,8 @@ B_PLUS_TREE_INTERNAL_PAGE_TYPE::Lookup(const KeyType &key,
     auto parent_page = reinterpret_cast<BPlusTreeInternalPage*>(buffer_pool_manager->FetchPage(parent_id));
     int this_index = parent_page->ValueIndex(GetPageId());
     int recipient_index = parent_page->ValueIndex(recipient->GetPageId());
-
-    assert(this_index != -1 && recipient_index != -1);
+    assert(this_index != -1 && recipient_index != -1 && this_index > recipient_index);
+    
     CopyLastFrom({parent_page->KeyAt(this_index), array[0].second}, buffer_pool_manager);
     
     // just for removing the warnings
@@ -297,9 +301,10 @@ B_PLUS_TREE_INTERNAL_PAGE_TYPE::Lookup(const KeyType &key,
 
   // why we need parent index?
   INDEX_TEMPLATE_ARGUMENTS
-    void B_PLUS_TREE_INTERNAL_PAGE_TYPE::CopyFirstFrom(
-      const MappingType &pair, int parent_index,
-      BufferPoolManager *buffer_pool_manager) {
+  void B_PLUS_TREE_INTERNAL_PAGE_TYPE::CopyFirstFrom(
+    const MappingType &pair, int parent_index,
+    BufferPoolManager *buffer_pool_manager) {
+    
     memmove(array+1, array, GetSize()*sizeof(MappingType));
     array[1].first = pair.first;
     array[0].second = pair.second;
@@ -313,9 +318,9 @@ B_PLUS_TREE_INTERNAL_PAGE_TYPE::Lookup(const KeyType &key,
  * DEBUG
  *****************************************************************************/
   INDEX_TEMPLATE_ARGUMENTS
-    void B_PLUS_TREE_INTERNAL_PAGE_TYPE::QueueUpChildren(
-      std::queue<BPlusTreePage *> *queue,
-      BufferPoolManager *buffer_pool_manager) {
+  void B_PLUS_TREE_INTERNAL_PAGE_TYPE::QueueUpChildren(
+    std::queue<BPlusTreePage *> *queue,
+    BufferPoolManager *buffer_pool_manager) {
     for (int i = 0; i < GetSize(); i++) {
       auto *page = buffer_pool_manager->FetchPage(array[i].second);
       if (page == nullptr)
@@ -328,7 +333,7 @@ B_PLUS_TREE_INTERNAL_PAGE_TYPE::Lookup(const KeyType &key,
   }
 
   INDEX_TEMPLATE_ARGUMENTS
-    std::string B_PLUS_TREE_INTERNAL_PAGE_TYPE::ToString(bool verbose) const {
+  std::string B_PLUS_TREE_INTERNAL_PAGE_TYPE::ToString(bool verbose) const {
     if (GetSize() == 0) {
       return "";
     }
