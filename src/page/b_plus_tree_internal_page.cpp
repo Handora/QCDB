@@ -18,7 +18,7 @@ namespace cmudb {
  */
 INDEX_TEMPLATE_ARGUMENTS
 void B_PLUS_TREE_INTERNAL_PAGE_TYPE::Init(page_id_t page_id,
-                                          page_id_t parent_id) {
+					  page_id_t parent_id) {
   SetPageId(page_id);
   SetParentPageId(parent_id);
   SetPageType(IndexPageType::INTERNAL_PAGE);
@@ -85,10 +85,11 @@ B_PLUS_TREE_INTERNAL_PAGE_TYPE::Lookup(const KeyType &key,
                                        const KeyComparator &comparator) const {
   
   for (int i = 1; i < GetSize(); ++i) {
-    if (comparator(key, array[i].first) <= 0) {
+    if (comparator(key, array[i].first) < 0) {
       return array[i-1].second;
     }
   }
+  
   return array[GetSize()-1].second;
 }
 
@@ -150,12 +151,13 @@ B_PLUS_TREE_INTERNAL_PAGE_TYPE::Lookup(const KeyType &key,
   void B_PLUS_TREE_INTERNAL_PAGE_TYPE::CopyHalfFrom(
     MappingType *items, int size, BufferPoolManager *buffer_pool_manager) {
     for (int i=0; i < size; ++i) {
-      // the recipient is a brand new page
-      array[i] = std::move(items[i]);
+      // the recipient is a brand new page 
       auto child_page = reinterpret_cast<BPlusTreePage *>(buffer_pool_manager->FetchPage(items[i].second));
       child_page->SetParentPageId(GetPageId());
       buffer_pool_manager->UnpinPage(child_page->GetPageId(), true);
     }
+
+    memmove(array, items, size*sizeof(MappingType));
     IncreaseSize(size); 
   }
 
@@ -169,7 +171,7 @@ B_PLUS_TREE_INTERNAL_PAGE_TYPE::Lookup(const KeyType &key,
  */
   INDEX_TEMPLATE_ARGUMENTS
   void B_PLUS_TREE_INTERNAL_PAGE_TYPE::Remove(int index) {
-    std::memmove(array+index, array+index+1, (GetSize()-index)*(sizeof(MappingType)));
+    std::memmove(array+index, array+index+1, (GetSize()-index-1)*(sizeof(MappingType)));
     IncreaseSize(-1);
   }
 
@@ -199,34 +201,36 @@ B_PLUS_TREE_INTERNAL_PAGE_TYPE::Lookup(const KeyType &key,
     assert(parent_id == recipient->GetParentPageId());
     assert(parent_id != INVALID_PAGE_ID);
     assert(GetSize()>0 && recipient->GetSize()>0);
-    
+
     auto parent_page = reinterpret_cast<BPlusTreeInternalPage*>(buffer_pool_manager->FetchPage(parent_id));
     int this_index = parent_page->ValueIndex(GetPageId());
     int recipient_index = parent_page->ValueIndex(recipient->GetPageId());
 
     // set a restriction that this_index is always bigger than recipient_index for simplicity
     assert(this_index != -1 && recipient_index != -1 && this_index > recipient_index);
-    // just for removing the warnings
-    if (this_index > recipient_index)
-      Remove(this_index);
+
     
+    array[0].first = parent_page->KeyAt(this_index);
     recipient->CopyAllFrom(array, GetSize(), buffer_pool_manager);
     SetSize(0);
+
+    // just for removing the warnings
+    if (this_index > recipient_index) 
+      parent_page->Remove(this_index);
+    
     buffer_pool_manager->UnpinPage(parent_id, true);
   }
 
   INDEX_TEMPLATE_ARGUMENTS
   void B_PLUS_TREE_INTERNAL_PAGE_TYPE::CopyAllFrom(
     MappingType *items, int size, BufferPoolManager *buffer_pool_manager) {
-    // always move from larger to smaller
-    // TODO
-    // should this be ok?
     for (int i=0; i<size; i++) {
-      array[GetSize()+i] = std::move(items[i]);
       auto child_page = reinterpret_cast<BPlusTreePage *>(buffer_pool_manager->FetchPage(items[i].second));
       child_page->SetParentPageId(GetPageId());
       buffer_pool_manager->UnpinPage(child_page->GetPageId(), true);
     }
+    
+    memmove(array+GetSize(), items, size*sizeof(MappingType));
     IncreaseSize(size); 
   }
 

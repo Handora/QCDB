@@ -67,6 +67,7 @@ namespace cmudb {
   KeyType B_PLUS_TREE_LEAF_PAGE_TYPE::KeyAt(int index) const {
     // replace with your own code
     assert(index >= 0 && index < GetSize());
+    
     return array[index].first;
   }
 
@@ -78,6 +79,7 @@ namespace cmudb {
   const MappingType &B_PLUS_TREE_LEAF_PAGE_TYPE::GetItem(int index) {
     // replace with your own code
     assert(index >= 0 && index < GetSize());
+    
     return array[index];
   }
 
@@ -99,8 +101,9 @@ namespace cmudb {
     if (comparator(KeyAt(key_index), key) == 0) {
       return GetSize();
     }
-    memmove(array+key_index, array+key_index+1, (GetSize()-key_index)*sizeof(MappingType));
-    IncreaseSize(-1);
+    memmove(array+key_index+1, array+key_index, (GetSize()-key_index)*sizeof(MappingType));
+    array[key_index] = {key, value}; 
+    IncreaseSize(1);
     return GetSize();
   }
 
@@ -122,11 +125,8 @@ namespace cmudb {
 
   INDEX_TEMPLATE_ARGUMENTS
   void B_PLUS_TREE_LEAF_PAGE_TYPE::CopyHalfFrom(MappingType *items, int size) {
-    
-    for (int i = 0; i < size; ++i) {
-      // a brand new page
-      array[i] = std::move(items[i]);
-    }
+    // move to a brand-new page
+    memmove(array, items, size*sizeof(MappingType));
     IncreaseSize(size);
   }
 
@@ -189,7 +189,7 @@ namespace cmudb {
     // give a restriction that always move from bigger to little
     // TODO
     // should this restriction be relaxed
-
+    
     // page_id_t parent_id = GetParentPageId();
     // assert(parent_id == recipient->GetParentPageId());
     // assert(parent_id != INVALID_PAGE_ID);
