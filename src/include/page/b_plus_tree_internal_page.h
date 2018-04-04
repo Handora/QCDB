@@ -38,7 +38,7 @@ public:
 
   ValueType Lookup(const KeyType &key, const KeyComparator &comparator) const;
   void PopulateNewRoot(const ValueType &old_value, const KeyType &new_key,
-                       const ValueType &new_value);
+		       const ValueType &new_value);
   int InsertNodeAfter(const ValueType &old_value, const KeyType &new_key,
                       const ValueType &new_value);
   void Remove(int index);
