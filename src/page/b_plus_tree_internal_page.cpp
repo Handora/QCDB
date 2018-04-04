@@ -32,7 +32,8 @@ void B_PLUS_TREE_INTERNAL_PAGE_TYPE::Init(page_id_t page_id,
 INDEX_TEMPLATE_ARGUMENTS
 KeyType B_PLUS_TREE_INTERNAL_PAGE_TYPE::KeyAt(int index) const {
   // because the key array in the internalnode is not full
-  assert(index > 0 && index < GetMaxSize());
+  // but we can use it for other purpose
+  assert(index >= 0 && index < GetMaxSize());
   
   KeyType key = array[index].first;
   return key;
@@ -119,7 +120,7 @@ B_PLUS_TREE_INTERNAL_PAGE_TYPE::Lookup(const KeyType &key,
   int B_PLUS_TREE_INTERNAL_PAGE_TYPE::InsertNodeAfter(
     const ValueType &old_value, const KeyType &new_key,
     const ValueType &new_value) {
-    assert(GetSize() < GetMaxSize());
+    assert(GetSize() < GetMaxSize()); 
     
     int old_index = ValueIndex(old_value);
     assert(old_index != -1);
@@ -127,7 +128,7 @@ B_PLUS_TREE_INTERNAL_PAGE_TYPE::Lookup(const KeyType &key,
     memmove(array+old_index+2, array+old_index+1, (GetSize()-old_index-1)*(sizeof(MappingType)));
     array[old_index+1].first = new_key;
     array[old_index+1].second = new_value;
-    IncreaseSize(1);
+    IncreaseSize(1); 
     return GetSize();
   }
 
@@ -141,7 +142,6 @@ B_PLUS_TREE_INTERNAL_PAGE_TYPE::Lookup(const KeyType &key,
   void B_PLUS_TREE_INTERNAL_PAGE_TYPE::MoveHalfTo(
     BPlusTreeInternalPage *recipient,
     BufferPoolManager *buffer_pool_manager) {
-    
     int origin_size = GetSize();
     SetSize(GetSize()/2); 
     recipient->CopyHalfFrom(array+GetSize(), origin_size-GetSize(), buffer_pool_manager); 
