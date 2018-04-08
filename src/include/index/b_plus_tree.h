@@ -51,7 +51,7 @@ public:
   // Print this B+ tree to stdout using a simple command-line
   std::string ToString(bool verbose = false);
 
-  void SayPage(int, int);
+  void SayPage(int);
 
   // read data from file and insert one by one
   void InsertFromFile(const std::string &file_name,

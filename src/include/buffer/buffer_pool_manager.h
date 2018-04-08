@@ -34,6 +34,9 @@ namespace cmudb {
   
     bool DeletePage(page_id_t page_id);
 
+    // test only
+    int PinnedNum() const;
+
   private:
     size_t pool_size_; // number of pages in buffer pool
     Page *pages_;      // array of pages

@@ -192,4 +192,14 @@ Page *BufferPoolManager::NewPage(page_id_t &page_id) {
   memset(page->data_, 0, PAGE_SIZE);
   return page;
 }
+
+  int BufferPoolManager::PinnedNum() const {
+    int sum = 0;
+    for (size_t i=0; i<pool_size_; i++) {
+      if (pages_[i].pin_count_ > 0) {
+	sum++;
+      }
+    }
+    return sum;
+  }
 } // namespace cmudb
