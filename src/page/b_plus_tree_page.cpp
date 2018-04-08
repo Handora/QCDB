@@ -49,5 +49,4 @@ namespace cmudb {
  * Helper methods to set lsn
  */
   void BPlusTreePage::SetLSN(lsn_t lsn) { lsn_ = lsn; }
-
 } // namespace cmudb

@@ -3,6 +3,7 @@
  */
 #include <iostream>
 #include <string>
+#include <queue>
 
 #include "common/exception.h"
 #include "common/logger.h"
@@ -40,28 +41,28 @@ bool BPLUSTREE_TYPE::IsEmpty() const {
  * This method is used for point query
  * @return : true means key exists
  */
-INDEX_TEMPLATE_ARGUMENTS
-bool BPLUSTREE_TYPE::GetValue(const KeyType &key,
-                              std::vector<ValueType> &result,
-                              Transaction *transaction) {
-  BPlusTreePage* page = reinterpret_cast<BPlusTreePage *>(buffer_pool_manager_->FetchPage(root_page_id_)); 
-  while (!page->IsLeafPage()) {
-    auto internal_page = static_cast<BPlusTreeInternalPage<KeyType, page_id_t, KeyComparator> *>(page); 
-    page_id_t page_id = internal_page->Lookup(key, comparator_);
-    buffer_pool_manager_->UnpinPage(internal_page->GetPageId(), false); 
-    page = reinterpret_cast<BPlusTreePage *>(buffer_pool_manager_->FetchPage(page_id));         
-  }
-  auto leaf_page = static_cast<B_PLUS_TREE_LEAF_PAGE_TYPE*>(page);
+  INDEX_TEMPLATE_ARGUMENTS
+  bool BPLUSTREE_TYPE::GetValue(const KeyType &key,
+				std::vector<ValueType> &result,
+				Transaction *transaction) {
+    BPlusTreePage* page = reinterpret_cast<BPlusTreePage *>(buffer_pool_manager_->FetchPage(root_page_id_)); 
+    while (!page->IsLeafPage()) {
+      auto internal_page = static_cast<BPlusTreeInternalPage<KeyType, page_id_t, KeyComparator> *>(page); 
+      page_id_t page_id = internal_page->Lookup(key, comparator_);
+      buffer_pool_manager_->UnpinPage(internal_page->GetPageId(), false); 
+      page = reinterpret_cast<BPlusTreePage *>(buffer_pool_manager_->FetchPage(page_id));         
+    }
+    auto leaf_page = static_cast<B_PLUS_TREE_LEAF_PAGE_TYPE*>(page);
   
-  ValueType value; 
-  if (leaf_page->Lookup(key, value, comparator_)) {
-    result.push_back(value);
+    ValueType value; 
+    if (leaf_page->Lookup(key, value, comparator_)) {
+      result.push_back(value);
+      buffer_pool_manager_->UnpinPage(leaf_page->GetPageId(), false);
+      return true;
+    }
     buffer_pool_manager_->UnpinPage(leaf_page->GetPageId(), false);
-    return true;
+    return false;
   }
-  buffer_pool_manager_->UnpinPage(leaf_page->GetPageId(), false);
-  return false;
-}
 
 /*****************************************************************************
  * INSERTION
@@ -404,21 +405,47 @@ void BPLUSTREE_TYPE::UpdateRootPageId(int insert_record) {
 INDEX_TEMPLATE_ARGUMENTS
 std::string BPLUSTREE_TYPE::ToString(bool verbose) { return "Empty tree"; }
 
+
+  /*****************************************************************************
+   * TEST ONLY
+   *****************************************************************************/
   
   INDEX_TEMPLATE_ARGUMENTS
   void BPLUSTREE_TYPE::SayPage(int page_id) {
     auto page = reinterpret_cast<BPlusTreePage*>(buffer_pool_manager_->FetchPage(page_id));
     int type = page->IsLeafPage();
     if (type == 1) {
-      auto leaf_page = reinterpret_cast<B_PLUS_TREE_LEAF_PAGE_TYPE*>(page); 
+      auto leaf_page = reinterpret_cast<B_PLUS_TREE_LEAF_PAGE_TYPE*>(page);
+      std::cout << "Leaf Page: ";
       std::cout << leaf_page->ToString(true) << std::endl;
     } else {
-      auto internal_page = reinterpret_cast<BPlusTreeInternalPage<KeyType, page_id_t, KeyComparator>*>(page); 
+      auto internal_page = reinterpret_cast<BPlusTreeInternalPage<KeyType, page_id_t, KeyComparator>*>(page);
+      std::cout << "Internal Page: ";
       std::cout << internal_page->ToString(true) << std::endl; 
     }
     buffer_pool_manager_->UnpinPage(page_id, false);
   }
-  
+
+  INDEX_TEMPLATE_ARGUMENTS
+  bool BPLUSTREE_TYPE::CheckIntegrity() const {
+    if (root_page_id_ == INVALID_PAGE_ID) {
+      // we should prove that
+      // tree may be not empty tree
+      return true;
+    }
+
+    auto page_queue = new std::queue<BPlusTree*>;
+    auto page = reinterpret_cast<BPlusTree*>(buffer_pool_manager_->FetchPage(root_page_id_));
+    if (page == nullptr) {
+      return false;
+    }
+
+    page_queue->push(page);
+
+    while (!page_queue->empty()) {
+      
+    }
+  }
 
   /*
    * This method is used for test only

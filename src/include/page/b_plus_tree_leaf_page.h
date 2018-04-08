@@ -60,6 +60,7 @@ public:
                          BufferPoolManager *buffer_pool_manager);
   // Debug
   std::string ToString(bool verbose = false) const;
+  bool CheckIntegrity(const KeyType *lower_bound, const KeyType *higher_bound, const KeyComparator &comparator, BufferPoolManager* buffer_pool_manager) const override;
 
 private:
   void CopyHalfFrom(MappingType *items, int size);

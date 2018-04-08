@@ -64,6 +64,8 @@ public:
   B_PLUS_TREE_LEAF_PAGE_TYPE *FindLeafPage(const KeyType &key,
                                            bool leftMost = false);
 
+  bool CheckIntegrity() const;
+
 private:
   void StartNewTree(const KeyType &key, const ValueType &value);
 

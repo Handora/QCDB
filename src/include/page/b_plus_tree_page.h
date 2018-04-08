@@ -57,6 +57,8 @@ public:
 
   void SetLSN(lsn_t lsn = INVALID_LSN);
 
+  // test only 
+  bool CheckIntegrity(const KeyType *lower_bound, const KeyType *higher_bound, const KeyComparator &comparator, BufferPoolManager* buffer_pool_manager) const;
 private:
   // member variable, attributes that both internal and leaf page share
   IndexPageType page_type_;

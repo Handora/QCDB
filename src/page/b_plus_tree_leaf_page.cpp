@@ -310,6 +310,35 @@ namespace cmudb {
     return stream.str();
   }
 
+  INDEX_TEMPLATE_ARGUMENTS
+  bool B_PLUS_TREE_LEAF_PAGE_TYPE::CheckIntegrity(const KeyType *lower_bound, const KeyType *higher_bound, const KeyComparator &comparator, BufferPoolManager* buffer_pool_manager) const {
+    // for key[x] value[x] key[x+1]
+    // for each K in value[x], key[x] <= K < key[x+1]
+    KeyType prev_key = array[1].first;
+    
+    if (lower_bound != nullptr && comparator(*lower_bound, prev_key) > 0) {
+      return false;
+    }
+
+    for (int i=2; i<GetSize(); i++) {
+      if (comparator(prev_key, array[i].first) >= 0) {
+	return false;
+      }
+      prev_key = array[i].first;
+    }
+
+    if (higher_bound != nullptr && comparator(prev_key, *higher_bound) >= 0) {
+      return false;
+    }
+
+    if (!IsRootPage() && GetSize() < GetMaxSize() / 2) {
+      return false;
+    }
+
+    return true;
+  }
+
+
   template class BPlusTreeLeafPage<GenericKey<4>, RID,
                                        GenericComparator<4>>;
 template class BPlusTreeLeafPage<GenericKey<8>, RID,
