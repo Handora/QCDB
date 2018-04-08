@@ -21,6 +21,7 @@
 #pragma once
 #include <utility>
 #include <vector>
+#include <memory>
 
 #include "page/b_plus_tree_page.h"
 
@@ -60,7 +61,7 @@ public:
                          BufferPoolManager *buffer_pool_manager);
   // Debug
   std::string ToString(bool verbose = false) const;
-  bool CheckIntegrity(const KeyType *lower_bound, const KeyType *higher_bound, const KeyComparator &comparator, BufferPoolManager* buffer_pool_manager) const override;
+  bool CheckIntegrity(std::shared_ptr<KeyType> lower_bound, std::shared_ptr<KeyType> higher_bound, const KeyComparator &comparator, BufferPoolManager* buffer_pool_manager) const;
 
 private:
   void CopyHalfFrom(MappingType *items, int size);

@@ -434,24 +434,69 @@ std::string BPLUSTREE_TYPE::ToString(bool verbose) { return "Empty tree"; }
       return true;
     }
 
-    auto page_queue = new std::queue<BPlusTree*>;
-    auto page = reinterpret_cast<BPlusTree*>(buffer_pool_manager_->FetchPage(root_page_id_));
-    if (page == nullptr) {
-      return false;
-    }
+    auto page_queue = new std::queue<std::tuple<page_id_t, std::shared_ptr<KeyType>, std::shared_ptr<KeyType>>>;
 
-    page_queue->push(page);
+    page_queue->push({root_page_id_, nullptr, nullptr});
 
     while (!page_queue->empty()) {
+      auto t = page_queue->front();
+      page_queue->pop();
+
+      auto page = reinterpret_cast<BPlusTreePage*>(buffer_pool_manager_->FetchPage(std::get<0>(t)));
+      if (page == nullptr) {
+	LOG_DEBUG("Buffer Pool may be full");
+	return false;
+      }
       
+      bool ok;
+      if (page->IsLeafPage()) {
+	auto leaf_page = reinterpret_cast<B_PLUS_TREE_LEAF_PAGE_TYPE*>(page);
+	ok = leaf_page->CheckIntegrity(std::get<1>(t), std::get<2>(t), comparator_, buffer_pool_manager_);
+      } else {
+	auto internal_page = reinterpret_cast<BPlusTreeInternalPage<KeyType, page_id_t, KeyComparator>*>(page);
+	ok = internal_page->CheckIntegrity(std::get<1>(t), std::get<2>(t), comparator_, buffer_pool_manager_);
+      }
+      if (ok == false) {
+	buffer_pool_manager_->UnpinPage(page->GetPageId(), false);
+	LOG_DEBUG("Page %d Intergrity error\n", page->GetPageId());
+	if (page->IsLeafPage()) {
+	  auto leaf_page = reinterpret_cast<B_PLUS_TREE_LEAF_PAGE_TYPE*>(page);
+	  if (leaf_page)
+	    LOG_DEBUG("%s\n", leaf_page->ToString(true).c_str());
+	} else {
+	  auto internal_page = reinterpret_cast<BPlusTreeInternalPage<KeyType, page_id_t, KeyComparator>*>(page);
+          if (internal_page)
+	    LOG_DEBUG("%s\n", internal_page->ToString(true).c_str());
+	}
+        
+	return false;
+      }
+
+      if (!page->IsLeafPage()) {
+	for (int i=0; i<page->GetSize(); i++) {
+	  auto internal_page = reinterpret_cast<BPlusTreeInternalPage<KeyType, page_id_t, KeyComparator>*>(page);
+
+	  if (i == 0) {
+	    page_queue->push({internal_page->ValueAt(i), std::get<1>(t), std::make_shared<KeyType>(internal_page->KeyAt(i+1))}); 
+	  } else if (i == page->GetSize()-1) {
+	    page_queue->push({internal_page->ValueAt(i), std::make_shared<KeyType>(internal_page->KeyAt(i)), std::get<2>(t)}); 
+	  } else {
+	    page_queue->push({internal_page->ValueAt(i), std::make_shared<KeyType>(internal_page->KeyAt(i)), std::make_shared<KeyType>(internal_page->KeyAt(i+1))}); 
+	  }
+	}
+      }
+
+      buffer_pool_manager_->UnpinPage(page->GetPageId(), false);
     }
+
+    return true;
   }
 
-  /*
-   * This method is used for test only
-   * Read data from file and insert one by one
-   */
-  INDEX_TEMPLATE_ARGUMENTS
+/*
+ * This method is used for test only
+ * Read data from file and insert one by one
+ */
+INDEX_TEMPLATE_ARGUMENTS
   void BPLUSTREE_TYPE::InsertFromFile(const std::string &file_name,
 				      Transaction *transaction) {
     int64_t key;

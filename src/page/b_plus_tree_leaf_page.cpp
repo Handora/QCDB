@@ -311,8 +311,8 @@ namespace cmudb {
   }
 
   INDEX_TEMPLATE_ARGUMENTS
-  bool B_PLUS_TREE_LEAF_PAGE_TYPE::CheckIntegrity(const KeyType *lower_bound, const KeyType *higher_bound, const KeyComparator &comparator, BufferPoolManager* buffer_pool_manager) const {
-    // for key[x] value[x] key[x+1]
+  bool B_PLUS_TREE_LEAF_PAGE_TYPE::CheckIntegrity(std::shared_ptr<KeyType> lower_bound, std::shared_ptr<KeyType> higher_bound, const KeyComparator &comparator, BufferPoolManager* buffer_pool_manager) const {
+    // for key[x] value[x] key[x+1] 
     // for each K in value[x], key[x] <= K < key[x+1]
     KeyType prev_key = array[1].first;
     

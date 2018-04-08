@@ -30,7 +30,6 @@ namespace cmudb {
     auto header_page = bpm->NewPage(page_id);
     (void)header_page;
 
-
     std::vector<int64_t> keys;
 
     for (int i=0; i<5000; i++) {
@@ -46,7 +45,7 @@ namespace cmudb {
     }
 
     EXPECT_EQ(1, bpm->PinnedNum());
-    return;
+    EXPECT_EQ(true, tree.CheckIntegrity());
     
     std::vector<RID> rids;
     for (auto key : keys) {

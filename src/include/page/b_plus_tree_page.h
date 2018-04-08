@@ -20,6 +20,7 @@
 #include <climits>
 #include <cstdlib>
 #include <string>
+#include <memory>
 
 #include "buffer/buffer_pool_manager.h"
 #include "index/generic_key.h"
@@ -56,9 +57,6 @@ public:
   void SetPageId(page_id_t page_id);
 
   void SetLSN(lsn_t lsn = INVALID_LSN);
-
-  // test only 
-  bool CheckIntegrity(const KeyType *lower_bound, const KeyType *higher_bound, const KeyComparator &comparator, BufferPoolManager* buffer_pool_manager) const;
 private:
   // member variable, attributes that both internal and leaf page share
   IndexPageType page_type_;

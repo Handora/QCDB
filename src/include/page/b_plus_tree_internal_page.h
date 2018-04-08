@@ -17,7 +17,7 @@
 #pragma once
 
 #include <queue>
-
+#include <memory>
 #include "page/b_plus_tree_page.h"
 
 namespace cmudb {
@@ -57,7 +57,7 @@ public:
   std::string ToString(bool verbose) const;
   void QueueUpChildren(std::queue<BPlusTreePage *> *queue,
                        BufferPoolManager *buffer_pool_manager);
-  bool CheckIntegrity(const KeyType *lower_bound, const KeyType *higher_bound, const KeyComparator &comparator, BufferPoolManager* buffer_pool_manager) const override;
+  bool CheckIntegrity(std::shared_ptr<KeyType> lower_bound, std::shared_ptr<KeyType> higher_bound, const KeyComparator &comparator, BufferPoolManager* buffer_pool_manager) const;
 private:
   void CopyHalfFrom(MappingType *items, int size,
                     BufferPoolManager *buffer_pool_manager);
