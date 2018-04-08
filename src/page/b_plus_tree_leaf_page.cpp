@@ -169,7 +169,9 @@ namespace cmudb {
   INDEX_TEMPLATE_ARGUMENTS
   int B_PLUS_TREE_LEAF_PAGE_TYPE::RemoveAndDeleteRecord(
     const KeyType &key, const KeyComparator &comparator) {
-    assert(GetSize() > GetMaxSize()/2);
+    
+    if (!IsLeafPage())
+      assert(GetSize() >= GetMinSize());
     
     for (int i=0; i<GetSize(); ++i) {
       if (comparator(key, array[i].first) == 0) {
@@ -177,8 +179,7 @@ namespace cmudb {
 	IncreaseSize(-1);
 	break;
       }
-    }
-
+    } 
     return GetSize();
   }
 
@@ -191,14 +192,19 @@ namespace cmudb {
  */
   INDEX_TEMPLATE_ARGUMENTS
   void B_PLUS_TREE_LEAF_PAGE_TYPE::MoveAllTo(BPlusTreeLeafPage *recipient,
-					     int, BufferPoolManager *) {
+					     int, BufferPoolManager *buffer_pool_manager) {
     // give a restriction that always move from bigger to little
     // TODO
     // should this restriction be relaxed
     
-    // page_id_t parent_id = GetParentPageId();
-    // assert(parent_id == recipient->GetParentPageId());
-    // assert(parent_id != INVALID_PAGE_ID);
+    page_id_t parent_id = GetParentPageId();
+    assert(parent_id == recipient->GetParentPageId());
+    assert(parent_id != INVALID_PAGE_ID);
+
+    auto parent_page = reinterpret_cast<BPlusTreeInternalPage<KeyType, page_id_t, KeyComparator>*>(parent_id);
+    assert(parent_page != nullptr);
+
+    parent_page->Remove(parent_page->ValueIndex(GetPageId()));
     
     recipient->CopyAllFrom(array, GetSize());
     recipient->SetNextPageId(GetNextPageId());
@@ -257,8 +263,8 @@ namespace cmudb {
     assert(parent_id == recipient->GetParentPageId());
     assert(parent_id != INVALID_PAGE_ID);
     auto parent_page = reinterpret_cast<BPlusTreeInternalPage<KeyType, page_id_t, KeyComparator>*>(buffer_pool_manager->FetchPage(parent_id));
-    int index = parent_page->ValueIndex(GetPageId());
-    recipient->CopyFirstFrom(array[GetSize()-1], index+1, buffer_pool_manager); 
+    int index = parent_page->ValueIndex(recipient->GetPageId());
+    recipient->CopyFirstFrom(array[GetSize()-1], index, buffer_pool_manager); 
     IncreaseSize(-1);
     buffer_pool_manager->UnpinPage(parent_id, true);
   }
@@ -271,8 +277,11 @@ namespace cmudb {
     page_id_t parent_id = GetParentPageId(); 
     assert(parent_id != INVALID_PAGE_ID);
 
+    // move the item to the first of the array and increase the size
     memmove(array+1, array, GetSize()*sizeof(MappingType));
     array[0] = item;
+    IncreaseSize(1);
+    
     auto parent_page = reinterpret_cast<BPlusTreeInternalPage<KeyType, page_id_t, KeyComparator>*>(buffer_pool_manager->FetchPage(parent_id));
     parent_page->SetKeyAt(parentIndex, array[0].first);
     buffer_pool_manager->UnpinPage(parent_id, true);

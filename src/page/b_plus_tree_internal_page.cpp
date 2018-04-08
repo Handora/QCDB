@@ -193,6 +193,8 @@ B_PLUS_TREE_INTERNAL_PAGE_TYPE::Lookup(const KeyType &key,
  * Remove all of key & value pairs from this page to "recipient" page, then
  * update relavent key & value pair in its parent page.
  */
+
+  // TODO(Handora): what does index_in_parent do?
   INDEX_TEMPLATE_ARGUMENTS
   void B_PLUS_TREE_INTERNAL_PAGE_TYPE::MoveAllTo(
     BPlusTreeInternalPage *recipient, int index_in_parent,
@@ -208,7 +210,7 @@ B_PLUS_TREE_INTERNAL_PAGE_TYPE::Lookup(const KeyType &key,
     int recipient_index = parent_page->ValueIndex(recipient->GetPageId());
 
     // set a restriction that this_index is always bigger than recipient_index for simplicity
-    assert(this_index != -1 && recipient_index != -1 && this_index > recipient_index);
+    assert(this_index != -1 && recipient_index != -1 && this_index+1 == recipient_index);
 
     
     array[0].first = parent_page->KeyAt(this_index);
@@ -254,7 +256,7 @@ B_PLUS_TREE_INTERNAL_PAGE_TYPE::Lookup(const KeyType &key,
     auto parent_page = reinterpret_cast<BPlusTreeInternalPage*>(buffer_pool_manager->FetchPage(parent_id));
     int this_index = parent_page->ValueIndex(GetPageId());
     int recipient_index = parent_page->ValueIndex(recipient->GetPageId());
-    assert(this_index != -1 && recipient_index != -1 && this_index > recipient_index);
+    assert(this_index != -1 && recipient_index != -1 && this_index - 1 == recipient_index);
     
     CopyLastFrom({parent_page->KeyAt(this_index), array[0].second}, buffer_pool_manager);
     
@@ -269,10 +271,12 @@ B_PLUS_TREE_INTERNAL_PAGE_TYPE::Lookup(const KeyType &key,
   INDEX_TEMPLATE_ARGUMENTS
   void B_PLUS_TREE_INTERNAL_PAGE_TYPE::CopyLastFrom(
     const MappingType &pair, BufferPoolManager *buffer_pool_manager) {
+    // move to the end and increase
     array[GetSize()] = pair;
-    auto child_page = reinterpret_cast<BPlusTreePage *>(buffer_pool_manager->FetchPage(pair.second));
-    child_page->SetParentPageId(GetPageId());
     IncreaseSize(1);
+    
+    auto child_page = reinterpret_cast<BPlusTreePage *>(buffer_pool_manager->FetchPage(pair.second));
+    child_page->SetParentPageId(GetPageId()); 
     buffer_pool_manager->UnpinPage(child_page->GetPageId(), true);
   }
 
@@ -284,8 +288,8 @@ B_PLUS_TREE_INTERNAL_PAGE_TYPE::Lookup(const KeyType &key,
   void B_PLUS_TREE_INTERNAL_PAGE_TYPE::MoveLastToFrontOf(
     BPlusTreeInternalPage *recipient, int parent_index,
       BufferPoolManager *buffer_pool_manager) {
-    page_id_t parent_id = GetParentPageId();
-    assert(parent_id == recipient->GetParentPageId());
+    page_id_t parent_id = recipient->GetParentPageId();
+    assert(parent_id == GetParentPageId());
     assert(parent_id != INVALID_PAGE_ID);
     assert(GetSize()>0 && recipient->GetSize()>0);
 
@@ -293,7 +297,7 @@ B_PLUS_TREE_INTERNAL_PAGE_TYPE::Lookup(const KeyType &key,
     int this_index = parent_page->ValueIndex(GetPageId());
     int recipient_index = parent_page->ValueIndex(recipient->GetPageId());
 
-    assert(this_index != -1 && recipient_index != -1);
+    assert(this_index != -1 && recipient_index != -1 && recipient_index == this_index+1);
     CopyFirstFrom({parent_page->KeyAt(this_index), array[GetSize()-1].second}, recipient_index, buffer_pool_manager);
     
     // just for removing the warnings
@@ -304,7 +308,7 @@ B_PLUS_TREE_INTERNAL_PAGE_TYPE::Lookup(const KeyType &key,
     buffer_pool_manager->UnpinPage(parent_id, true);
   }
 
-  // why we need parent index?
+  // TODO(Handora): why we need parent index?
   INDEX_TEMPLATE_ARGUMENTS
   void B_PLUS_TREE_INTERNAL_PAGE_TYPE::CopyFirstFrom(
     const MappingType &pair, int parent_index,
