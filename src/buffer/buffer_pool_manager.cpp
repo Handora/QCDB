@@ -54,6 +54,7 @@ Page *BufferPoolManager::FetchPage(page_id_t page_id) {
 
   // if exist, pin the page and return immediately
   if (ok) {
+    std::cout << page->GetPageId() << std::endl;
     if (page->pin_count_ == 0)
       replacer_->Erase(page);
     page->pin_count_ += 1;
@@ -75,7 +76,8 @@ Page *BufferPoolManager::FetchPage(page_id_t page_id) {
     if (page->is_dirty_) {
       disk_manager_->WritePage(page->page_id_, page->data_);
     } 
-  } 
+  }
+  
   page->is_dirty_ = false; 
   page->pin_count_ = 1;
   page->page_id_ = page_id;
@@ -140,9 +142,8 @@ bool BufferPoolManager::DeletePage(page_id_t page_id) {
   Page *page = nullptr;
   bool ok = page_table_->Find(page_id, page);
 
-  if (ok && page->pin_count_ != 0) {
-    page->is_dirty_ = false;
-    page->pin_count_ = 0;
+  if (ok && page->pin_count_ == 0) {
+    page->is_dirty_ = false; 
     page->page_id_ = INVALID_PAGE_ID; 
     page_table_->Remove(page_id);
     free_list_->push_back(page);
@@ -201,5 +202,19 @@ Page *BufferPoolManager::NewPage(page_id_t &page_id) {
       }
     }
     return sum;
+  }
+
+  std::vector<page_id_t> BufferPoolManager::PinnedPageId() const {
+    std::vector<page_id_t> res;
+    for (size_t i=0; i<pool_size_; i++) {
+      if (pages_[i].pin_count_ > 0) {
+        res.push_back(pages_[i].GetPageId());
+      }
+    }
+
+    return res;
+    // TODO(Handora): wht std::move wrong?
+    // why
+    // return std::move(res);
   }
 } // namespace cmudb

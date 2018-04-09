@@ -246,26 +246,34 @@ void BPLUSTREE_TYPE::Remove(const KeyType &key, Transaction *transaction) {
   // TODO(Handora): use static_cast instead of reinterpret_cast
   auto page = reinterpret_cast<BPlusTreePage*>(buffer_pool_manager_->FetchPage(root_page_id_));
   while (!page->IsLeafPage()) {
-    auto internal_page = reinterpret_cast<BPlusTreeInternalPage<KeyType, page_id_t, KeyComparator>*>(page);
+    auto internal_page = static_cast<BPlusTreeInternalPage<KeyType, page_id_t, KeyComparator>*>(page);
     page_id_t page_id = internal_page->Lookup(key, comparator_);
     buffer_pool_manager_->UnpinPage(internal_page->GetPageId(), false);
     page = reinterpret_cast<BPlusTreePage*>(buffer_pool_manager_->FetchPage(page_id));
   }
-  auto leaf_page = reinterpret_cast<B_PLUS_TREE_LEAF_PAGE_TYPE*>(page);
+  auto leaf_page = static_cast<B_PLUS_TREE_LEAF_PAGE_TYPE*>(page);
   
   leaf_page->RemoveAndDeleteRecord(key, comparator_); 
   
   // if page is the root
   if (page->IsRootPage()) {
-    if (!AdjustRoot(page))
+    if (!AdjustRoot(page)) {
       buffer_pool_manager_->UnpinPage(leaf_page->GetPageId(), true); 
+    } else {
+      buffer_pool_manager_->UnpinPage(leaf_page->GetPageId(), true);
+      buffer_pool_manager_->DeletePage(leaf_page->GetPageId());
+    }
     return ;
   }
 
+  bool ok = false;
   if (leaf_page->GetSize() < leaf_page->GetMinSize()) {
-    CoalesceOrRedistribute(leaf_page);
+    ok = CoalesceOrRedistribute(leaf_page);
   } 
-  buffer_pool_manager_->UnpinPage(leaf_page->GetPageId(), true); 
+  buffer_pool_manager_->UnpinPage(leaf_page->GetPageId(), true);
+  if (ok) {
+    assert(buffer_pool_manager_->DeletePage(leaf_page->GetPageId()));
+  }
 }
 
 /*
@@ -278,16 +286,24 @@ void BPLUSTREE_TYPE::Remove(const KeyType &key, Transaction *transaction) {
 INDEX_TEMPLATE_ARGUMENTS
 template <typename N>
 bool BPLUSTREE_TYPE::CoalesceOrRedistribute(N *node, Transaction *transaction) {
-
   page_id_t parent_page_id = node->GetParentPageId();
   assert(parent_page_id != INVALID_PAGE_ID); 
   if (node->GetSize() >= node->GetMinSize()) {
     return false;
-  } 
+  }
 
+  std::cout << "==" << parent_page_id << std::endl;
+  
   auto parent_page = reinterpret_cast<BPlusTreeInternalPage<KeyType, page_id_t, KeyComparator>*>(buffer_pool_manager_->FetchPage(parent_page_id));
+
+  std::cout << "Hello" << std::endl;
+  for (auto v: buffer_pool_manager_->PinnedPageId()) {
+    std::cout << v << std::endl;
+  }
+  std::cout << "Hello" << std::endl;
+ 
   int node_index = parent_page->ValueIndex(node->GetPageId());
-  N *left_sibling_page = nullptr, *right_sibling_page = nullptr; 
+  N *left_sibling_page = nullptr, *right_sibling_page = nullptr;
   
   if (node_index-1 >= 0) {
     page_id_t left_sibling_page_id = parent_page->ValueAt(node_index-1);
@@ -321,26 +337,41 @@ bool BPLUSTREE_TYPE::CoalesceOrRedistribute(N *node, Transaction *transaction) {
     } 
   }
 
-  bool ok;
+  bool ok = false;
+  bool delete_node = false;
+  
   if (node_index - 1 >= 0) {
-    ok = Coalesce(left_sibling_page, node, parent_page, node_index); 
+    ok = Coalesce(left_sibling_page, node, parent_page, node_index);
+    delete_node = true;
   } else {
-    ok = Coalesce(node, right_sibling_page, parent_page, node_index); 
+    ok = Coalesce(node, right_sibling_page, parent_page, node_index);
+    delete_node = false;
+    buffer_pool_manager_->UnpinPage(right_sibling_page->GetPageId(), true);
+    assert(buffer_pool_manager_->DeletePage(right_sibling_page->GetPageId()));
+    right_sibling_page = nullptr;
   }
 
   // TODO(Handora): optimization
   // may be left or right or parent not changed
   if (left_sibling_page != nullptr) {
     buffer_pool_manager_->UnpinPage(left_sibling_page->GetPageId(), true);
-  }
+  } 
 
   if (right_sibling_page != nullptr) {
     buffer_pool_manager_->UnpinPage(right_sibling_page->GetPageId(), true);
   }
 
-  buffer_pool_manager_->UnpinPage(parent_page->GetPageId(), true);
+  // this sstyle is ugly
+  // but we need do so to make it simpler
+  // may be need some optimization
+  if (ok) {
+    buffer_pool_manager_->UnpinPage(parent_page->GetPageId(), true);
+    assert(buffer_pool_manager_->DeletePage(parent_page->GetPageId()));
+  } else {
+    buffer_pool_manager_->UnpinPage(parent_page->GetPageId(), true);
+  }
 
-  return ok;
+  return delete_node;
 }
 
 /*
@@ -361,16 +392,12 @@ bool BPLUSTREE_TYPE::Coalesce(
   N *&neighbor_node, N *&node,
   BPlusTreeInternalPage<KeyType, page_id_t, KeyComparator> *&parent,
   int index, Transaction *transaction) {
+  
   // TODO(Handora): The second parameter is now no use
-  node->MoveAllTo(neighbor_node, index, buffer_pool_manager_);
-  buffer_pool_manager_->DeletePage(node->GetPageId());
+  node->MoveAllTo(neighbor_node, index, buffer_pool_manager_); 
 
   if (parent->IsRootPage()) {
-    bool ok = AdjustRoot(parent);
-    if (!ok) {
-      buffer_pool_manager_->UnpinPage(parent->GetPageId(), true); 
-    }
-    return ok;
+    return AdjustRoot(parent); 
   } 
   return CoalesceOrRedistribute(parent);
 }
@@ -390,7 +417,8 @@ void BPLUSTREE_TYPE::Redistribute(N *neighbor_node, N *node, int index) {
   if (index == 0) {
     neighbor_node->MoveFirstToEndOf(node, buffer_pool_manager_); 
   } else {
-    neighbor_node->MoveLastToFrontOf(node, 0, buffer_pool_manager_);
+    // the second parameter seems no use
+    neighbor_node->MoveLastToFrontOf(node, index, buffer_pool_manager_);
   }
 }
 /*
@@ -405,14 +433,24 @@ void BPLUSTREE_TYPE::Redistribute(N *neighbor_node, N *node, int index) {
  */
 INDEX_TEMPLATE_ARGUMENTS
 bool BPLUSTREE_TYPE::AdjustRoot(BPlusTreePage *old_root_node) {
-  if (old_root_node->GetSize() >= 1) {
+  if (old_root_node->GetSize() >= 2) {
     return false;
-  } else {
-    buffer_pool_manager_->DeletePage(old_root_node->GetPageId());
-    root_page_id_ = INVALID_PAGE_ID;
+  } else if (old_root_node->GetSize() == 1) {
+    if (old_root_node->IsLeafPage()) {
+      root_page_id_ = INVALID_PAGE_ID;
+    } else {
+      auto internal_page = static_cast<BPlusTreeInternalPage<KeyType, page_id_t, KeyComparator>*>(old_root_node);
+      root_page_id_ = internal_page->ValueAt(0);
+    }
+    
     UpdateRootPageId(); 
     return true;
   }
+
+  // never reach here
+  // for warning purpose
+  assert(false);
+  return false;
 }
 
 /*****************************************************************************

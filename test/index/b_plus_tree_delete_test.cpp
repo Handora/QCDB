@@ -115,22 +115,17 @@ namespace cmudb {
     }
 
     EXPECT_EQ(tree.CheckIntegrity(), true);
-    EXPECT_EQ(1, bpm->PinnedNum());
-    
+    EXPECT_EQ(1, bpm->PinnedNum()); 
+
     // delete phase
     for (auto item: keys) {
       auto key = item.first;
       auto deleted = item.second;
       index_key.SetFromInteger(key); 
       if (deleted) {
-	std::string prev = tree.ToString(true);
-	tree.Remove(index_key, transaction);
-	if (!tree.CheckIntegrity()) {
-	  std::cout << key << std::endl;
-	  std::cout << prev << std::endl;
-	  std::cout << tree.ToString(true) << std::endl;
-	  return ;
-	}
+	tree.Remove(index_key, transaction); 
+      }
+      if (bpm->PinnedNum() != 1) {
       }
     }
 
@@ -155,7 +150,7 @@ namespace cmudb {
       EXPECT_EQ(rids[0].GetSlotNum(), value);
     }
   }
-
+  
   // TEST(BPlusTreeDeleteTests, BigRandomDeleteTest) {
   //   Schema *key_schema = ParseCreateStatement("a bigint");
   //   GenericComparator<8> comparator(key_schema);

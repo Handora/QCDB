@@ -157,7 +157,7 @@ B_PLUS_TREE_INTERNAL_PAGE_TYPE::Lookup(const KeyType &key,
       child_page->SetParentPageId(GetPageId());
       buffer_pool_manager->UnpinPage(child_page->GetPageId(), true);
     }
-
+    
     memmove(array, items, size*sizeof(MappingType));
     IncreaseSize(size); 
   }
