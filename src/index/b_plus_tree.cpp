@@ -13,26 +13,27 @@
 
 namespace cmudb {
 
-INDEX_TEMPLATE_ARGUMENTS
-BPLUSTREE_TYPE::BPlusTree(const std::string &name,
-                                BufferPoolManager *buffer_pool_manager,
-                                const KeyComparator &comparator,
-                                page_id_t root_page_id)
+  INDEX_TEMPLATE_ARGUMENTS
+  BPLUSTREE_TYPE::BPlusTree(const std::string &name,
+			    BufferPoolManager *buffer_pool_manager,
+			    const KeyComparator &comparator,
+			    page_id_t root_page_id)
     : index_name_(name), root_page_id_(root_page_id),
       buffer_pool_manager_(buffer_pool_manager), comparator_(comparator) {}
 
 /*
  * Helper function to decide whether current b+tree is empty
  */
-INDEX_TEMPLATE_ARGUMENTS
-bool BPLUSTREE_TYPE::IsEmpty() const {
-  if (root_page_id_ == INVALID_PAGE_ID) {
-    return true;
-  } 
-  BPlusTreePage* page = reinterpret_cast<BPlusTreePage *>(buffer_pool_manager_->FetchPage(root_page_id_));
-  buffer_pool_manager_->UnpinPage(root_page_id_, false);
-  return page->GetSize() == 0; 
-}
+  INDEX_TEMPLATE_ARGUMENTS
+  bool BPLUSTREE_TYPE::IsEmpty() const {
+    if (root_page_id_ == INVALID_PAGE_ID) {
+      return true;
+    } 
+    BPlusTreePage* page = reinterpret_cast<BPlusTreePage *>(buffer_pool_manager_->FetchPage(root_page_id_));
+    buffer_pool_manager_->UnpinPage(root_page_id_, false);
+    return page->GetSize() == 0;
+  }
+  
 /*****************************************************************************
  * SEARCH
  *****************************************************************************/
@@ -276,18 +277,24 @@ void BPLUSTREE_TYPE::Remove(const KeyType &key, Transaction *transaction) {
  */
 INDEX_TEMPLATE_ARGUMENTS
 template <typename N>
-bool BPLUSTREE_TYPE::CoalesceOrRedistribute(N *node, Transaction *transaction) {  
+bool BPLUSTREE_TYPE::CoalesceOrRedistribute(N *node, Transaction *transaction) {
+
   page_id_t parent_page_id = node->GetParentPageId();
-  assert(parent_page_id != INVALID_PAGE_ID);
+  assert(parent_page_id != INVALID_PAGE_ID); 
+  if (node->GetSize() >= node->GetMinSize()) {
+    return false;
+  } 
 
   auto parent_page = reinterpret_cast<BPlusTreeInternalPage<KeyType, page_id_t, KeyComparator>*>(buffer_pool_manager_->FetchPage(parent_page_id));
   int node_index = parent_page->ValueIndex(node->GetPageId());
-  N *left_sibling_page = nullptr, *right_sibling_page = nullptr;
+  N *left_sibling_page = nullptr, *right_sibling_page = nullptr; 
   
   if (node_index-1 >= 0) {
     page_id_t left_sibling_page_id = parent_page->ValueAt(node_index-1);
     left_sibling_page = reinterpret_cast<N*>(buffer_pool_manager_->FetchPage(left_sibling_page_id));
-    if (left_sibling_page->GetSize()+node->GetSize() > node->GetMaxSize()) {
+
+    // because we already delete the one, so we can merge it when sum size is maxsize
+    if (left_sibling_page->GetSize()+node->GetSize() >= node->GetMaxSize()) {
       // move from the left sibling page to the node so the index is
       // not zero
       Redistribute(left_sibling_page, node, 1);
@@ -296,15 +303,16 @@ bool BPLUSTREE_TYPE::CoalesceOrRedistribute(N *node, Transaction *transaction) {
       return false;
     }
   }
-  
+
+  // because we already delete the one, so we can merge it when sum size is maxsize
   if (node_index+1 < parent_page->GetSize()) {
     page_id_t right_sibling_page_id = parent_page->ValueAt(node_index+1);
     right_sibling_page = reinterpret_cast<N*>(buffer_pool_manager_->FetchPage(right_sibling_page_id));
-    if (right_sibling_page->GetSize()+node->GetSize() > node->GetMaxSize()) {
+    if (right_sibling_page->GetSize()+node->GetSize() >= node->GetMaxSize()) {
       // move from the right sibling page to the node so the index is
       // zero
       Redistribute(right_sibling_page, node, 0);
-      if (left_sibling_page) {
+      if (left_sibling_page != nullptr) {
 	buffer_pool_manager_->UnpinPage(left_sibling_page->GetPageId(), true);
       }
       buffer_pool_manager_->UnpinPage(right_sibling_page->GetPageId(), true);
@@ -356,7 +364,14 @@ bool BPLUSTREE_TYPE::Coalesce(
   // TODO(Handora): The second parameter is now no use
   node->MoveAllTo(neighbor_node, index, buffer_pool_manager_);
   buffer_pool_manager_->DeletePage(node->GetPageId());
-  
+
+  if (parent->IsRootPage()) {
+    bool ok = AdjustRoot(parent);
+    if (!ok) {
+      buffer_pool_manager_->UnpinPage(parent->GetPageId(), true); 
+    }
+    return ok;
+  } 
   return CoalesceOrRedistribute(parent);
 }
 
@@ -460,7 +475,53 @@ void BPLUSTREE_TYPE::UpdateRootPageId(int insert_record) {
  * print out whole b+tree sturcture, rank by rank
  */
 INDEX_TEMPLATE_ARGUMENTS
-std::string BPLUSTREE_TYPE::ToString(bool verbose) { return "Empty tree"; }
+std::string BPLUSTREE_TYPE::ToString(bool verbose) {
+  std::ostringstream os;
+  if (IsEmpty()) {
+    return "Empty tree";
+  }
+
+  auto page_queue = new std::queue<std::pair<page_id_t, int>>;
+
+  page_queue->push({root_page_id_, 1});
+
+  int phase = 0;
+  
+  while (!page_queue->empty()) {
+    auto t = page_queue->front();
+    page_queue->pop();
+
+    auto page = reinterpret_cast<BPlusTreePage*>(buffer_pool_manager_->FetchPage(t.first));
+    if (page == nullptr) {
+      LOG_DEBUG("Buffer Pool may be full"); 
+    }
+
+    if (phase != t.second) {
+      os << "=============================================" << std::endl;
+      os << "The " << t.second << " Phase:" << std::endl;
+      phase = t.second;
+    }
+
+    if (page->IsLeafPage()) {
+      auto leaf_page = reinterpret_cast<B_PLUS_TREE_LEAF_PAGE_TYPE*>(page);
+      os << leaf_page->ToString(verbose) << std::endl;
+    } else {
+      auto internal_page = reinterpret_cast<BPlusTreeInternalPage<KeyType, page_id_t, KeyComparator>*>(page);
+      os << internal_page->ToString(verbose) << std::endl;
+    }
+    
+    if (!page->IsLeafPage()) {
+      for (int i=0; i<page->GetSize(); i++) {
+	auto internal_page = reinterpret_cast<BPlusTreeInternalPage<KeyType, page_id_t, KeyComparator>*>(page);
+	page_queue->push({internal_page->ValueAt(i), t.second+1}); 
+      }
+    }
+
+    buffer_pool_manager_->UnpinPage(page->GetPageId(), false);
+  }
+
+  return os.str();
+}
 
 
   /*****************************************************************************
@@ -545,7 +606,7 @@ std::string BPLUSTREE_TYPE::ToString(bool verbose) { return "Empty tree"; }
 
       buffer_pool_manager_->UnpinPage(page->GetPageId(), false);
     }
-
+    
     return true;
   }
 

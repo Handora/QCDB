@@ -209,8 +209,8 @@ B_PLUS_TREE_INTERNAL_PAGE_TYPE::Lookup(const KeyType &key,
     int this_index = parent_page->ValueIndex(GetPageId());
     int recipient_index = parent_page->ValueIndex(recipient->GetPageId());
 
-    // set a restriction that this_index is always bigger than recipient_index for simplicity
-    assert(this_index != -1 && recipient_index != -1 && this_index+1 == recipient_index);
+    // set a restriction that this_index is always bigger than recipient_index for simplicity 
+    assert(this_index != -1 && recipient_index != -1 && this_index == recipient_index+1);
 
     
     array[0].first = parent_page->KeyAt(this_index);
@@ -258,7 +258,7 @@ B_PLUS_TREE_INTERNAL_PAGE_TYPE::Lookup(const KeyType &key,
     int recipient_index = parent_page->ValueIndex(recipient->GetPageId());
     assert(this_index != -1 && recipient_index != -1 && this_index - 1 == recipient_index);
     
-    CopyLastFrom({parent_page->KeyAt(this_index), array[0].second}, buffer_pool_manager);
+    recipient->CopyLastFrom({parent_page->KeyAt(this_index), array[0].second}, buffer_pool_manager);
     
     // just for removing the warnings
     if (this_index > recipient_index)
@@ -298,7 +298,7 @@ B_PLUS_TREE_INTERNAL_PAGE_TYPE::Lookup(const KeyType &key,
     int recipient_index = parent_page->ValueIndex(recipient->GetPageId());
 
     assert(this_index != -1 && recipient_index != -1 && recipient_index == this_index+1);
-    CopyFirstFrom({parent_page->KeyAt(this_index), array[GetSize()-1].second}, recipient_index, buffer_pool_manager);
+    recipient->CopyFirstFrom({parent_page->KeyAt(this_index), array[GetSize()-1].second}, recipient_index, buffer_pool_manager);
     
     // just for removing the warnings
     if (this_index > recipient_index)
@@ -393,7 +393,7 @@ B_PLUS_TREE_INTERNAL_PAGE_TYPE::Lookup(const KeyType &key,
       LOG_DEBUG("higher or equal than higher bound");
       return false;
     }
-
+    
     if (!IsRootPage() && GetSize() < GetMaxSize() / 2) {
       LOG_DEBUG("non-root page less than half of max size");
       return false;

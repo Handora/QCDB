@@ -201,10 +201,11 @@ namespace cmudb {
     assert(parent_id == recipient->GetParentPageId());
     assert(parent_id != INVALID_PAGE_ID);
 
-    auto parent_page = reinterpret_cast<BPlusTreeInternalPage<KeyType, page_id_t, KeyComparator>*>(parent_id);
+    auto parent_page = reinterpret_cast<BPlusTreeInternalPage<KeyType, page_id_t, KeyComparator>*>(buffer_pool_manager->FetchPage(parent_id));
     assert(parent_page != nullptr);
 
-    parent_page->Remove(parent_page->ValueIndex(GetPageId()));
+    int index = parent_page->ValueIndex(GetPageId());
+    parent_page->Remove(index);
     
     recipient->CopyAllFrom(array, GetSize());
     recipient->SetNextPageId(GetNextPageId());
