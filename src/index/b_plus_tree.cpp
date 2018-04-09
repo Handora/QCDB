@@ -292,16 +292,8 @@ bool BPLUSTREE_TYPE::CoalesceOrRedistribute(N *node, Transaction *transaction) {
     return false;
   }
 
-  std::cout << "==" << parent_page_id << std::endl;
+  auto parent_page = reinterpret_cast<BPlusTreeInternalPage<KeyType, page_id_t, KeyComparator>*>(buffer_pool_manager_->FetchPage(parent_page_id)); 
   
-  auto parent_page = reinterpret_cast<BPlusTreeInternalPage<KeyType, page_id_t, KeyComparator>*>(buffer_pool_manager_->FetchPage(parent_page_id));
-
-  std::cout << "Hello" << std::endl;
-  for (auto v: buffer_pool_manager_->PinnedPageId()) {
-    std::cout << v << std::endl;
-  }
-  std::cout << "Hello" << std::endl;
- 
   int node_index = parent_page->ValueIndex(node->GetPageId());
   N *left_sibling_page = nullptr, *right_sibling_page = nullptr;
   

@@ -7,6 +7,7 @@
 #include "common/logger.h"
 #include "index/b_plus_tree.h"
 #include "vtable/virtual_table.h"
+#include "page/b_plus_tree_internal_page.h"
 
 namespace cmudb {
 
@@ -124,9 +125,7 @@ namespace cmudb {
       index_key.SetFromInteger(key); 
       if (deleted) {
 	tree.Remove(index_key, transaction); 
-      }
-      if (bpm->PinnedNum() != 1) {
-      }
+      } 
     }
 
     EXPECT_EQ(tree.CheckIntegrity(), true);
