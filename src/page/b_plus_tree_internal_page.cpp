@@ -153,7 +153,7 @@ B_PLUS_TREE_INTERNAL_PAGE_TYPE::Lookup(const KeyType &key,
     MappingType *items, int size, BufferPoolManager *buffer_pool_manager) {
     for (int i=0; i < size; ++i) {
       // the recipient is a brand new page 
-      auto child_page = reinterpret_cast<BPlusTreePage *>(buffer_pool_manager->FetchPage(items[i].second));
+      auto child_page = reinterpret_cast<BPlusTreePage *>(buffer_pool_manager->FetchPage(items[i].second)->GetData());
       child_page->SetParentPageId(GetPageId());
       buffer_pool_manager->UnpinPage(child_page->GetPageId(), true);
     }
@@ -205,7 +205,7 @@ B_PLUS_TREE_INTERNAL_PAGE_TYPE::Lookup(const KeyType &key,
     assert(parent_id != INVALID_PAGE_ID);
     assert(GetSize()>0 && recipient->GetSize()>0);
 
-    auto parent_page = reinterpret_cast<BPlusTreeInternalPage*>(buffer_pool_manager->FetchPage(parent_id));
+    auto parent_page = reinterpret_cast<BPlusTreeInternalPage*>(buffer_pool_manager->FetchPage(parent_id)->GetData());
     int this_index = parent_page->ValueIndex(GetPageId());
     int recipient_index = parent_page->ValueIndex(recipient->GetPageId());
 
@@ -228,7 +228,7 @@ B_PLUS_TREE_INTERNAL_PAGE_TYPE::Lookup(const KeyType &key,
   void B_PLUS_TREE_INTERNAL_PAGE_TYPE::CopyAllFrom(
     MappingType *items, int size, BufferPoolManager *buffer_pool_manager) {
     for (int i=0; i<size; i++) {
-      auto child_page = reinterpret_cast<BPlusTreePage *>(buffer_pool_manager->FetchPage(items[i].second));
+      auto child_page = reinterpret_cast<BPlusTreePage *>(buffer_pool_manager->FetchPage(items[i].second)->GetData());
       child_page->SetParentPageId(GetPageId());
       buffer_pool_manager->UnpinPage(child_page->GetPageId(), true);
     }
@@ -253,7 +253,7 @@ B_PLUS_TREE_INTERNAL_PAGE_TYPE::Lookup(const KeyType &key,
     assert(parent_id != INVALID_PAGE_ID);
     assert(GetSize()>0 && recipient->GetSize()>0);
 
-    auto parent_page = reinterpret_cast<BPlusTreeInternalPage*>(buffer_pool_manager->FetchPage(parent_id));
+    auto parent_page = reinterpret_cast<BPlusTreeInternalPage*>(buffer_pool_manager->FetchPage(parent_id)->GetData());
     int this_index = parent_page->ValueIndex(GetPageId());
     int recipient_index = parent_page->ValueIndex(recipient->GetPageId());
     assert(this_index != -1 && recipient_index != -1 && this_index - 1 == recipient_index);
@@ -266,6 +266,7 @@ B_PLUS_TREE_INTERNAL_PAGE_TYPE::Lookup(const KeyType &key,
 
     memmove(array, array+1, (GetSize()-1)*sizeof(MappingType));
     IncreaseSize(-1);
+    buffer_pool_manager->UnpinPage(parent_page->GetPageId(), true);
   }
 
   INDEX_TEMPLATE_ARGUMENTS
@@ -275,7 +276,7 @@ B_PLUS_TREE_INTERNAL_PAGE_TYPE::Lookup(const KeyType &key,
     array[GetSize()] = pair;
     IncreaseSize(1);
     
-    auto child_page = reinterpret_cast<BPlusTreePage *>(buffer_pool_manager->FetchPage(pair.second));
+    auto child_page = reinterpret_cast<BPlusTreePage *>(buffer_pool_manager->FetchPage(pair.second)->GetData());
     child_page->SetParentPageId(GetPageId()); 
     buffer_pool_manager->UnpinPage(child_page->GetPageId(), true);
   }
@@ -293,7 +294,7 @@ B_PLUS_TREE_INTERNAL_PAGE_TYPE::Lookup(const KeyType &key,
     assert(parent_id != INVALID_PAGE_ID);
     assert(GetSize()>0 && recipient->GetSize()>0);
 
-    auto parent_page = reinterpret_cast<BPlusTreeInternalPage*>(buffer_pool_manager->FetchPage(parent_id));
+    auto parent_page = reinterpret_cast<BPlusTreeInternalPage*>(buffer_pool_manager->FetchPage(parent_id)->GetData());
     int this_index = parent_page->ValueIndex(GetPageId());
     int recipient_index = parent_page->ValueIndex(recipient->GetPageId());
 
@@ -317,7 +318,7 @@ B_PLUS_TREE_INTERNAL_PAGE_TYPE::Lookup(const KeyType &key,
     memmove(array+1, array, GetSize()*sizeof(MappingType));
     array[1].first = pair.first;
     array[0].second = pair.second;
-    auto child_page = reinterpret_cast<BPlusTreePage *>(buffer_pool_manager->FetchPage(pair.second));
+    auto child_page = reinterpret_cast<BPlusTreePage *>(buffer_pool_manager->FetchPage(pair.second)->GetData());
     child_page->SetParentPageId(GetPageId());
     IncreaseSize(1);
     buffer_pool_manager->UnpinPage(child_page->GetPageId(), true);

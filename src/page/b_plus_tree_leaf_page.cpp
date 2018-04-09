@@ -201,11 +201,12 @@ namespace cmudb {
     assert(parent_id == recipient->GetParentPageId());
     assert(parent_id != INVALID_PAGE_ID);
 
-    auto parent_page = reinterpret_cast<BPlusTreeInternalPage<KeyType, page_id_t, KeyComparator>*>(buffer_pool_manager->FetchPage(parent_id));
+    auto parent_page = reinterpret_cast<BPlusTreeInternalPage<KeyType, page_id_t, KeyComparator>*>(buffer_pool_manager->FetchPage(parent_id)->GetData());
     assert(parent_page != nullptr);
 
     int index = parent_page->ValueIndex(GetPageId());
     parent_page->Remove(index);
+    buffer_pool_manager->UnpinPage(parent_id, true);
     
     recipient->CopyAllFrom(array, GetSize());
     recipient->SetNextPageId(GetNextPageId());
@@ -240,7 +241,7 @@ namespace cmudb {
     memmove(array, array+1, (GetSize()-1)*sizeof(MappingType));
     IncreaseSize(-1);
 
-    auto parent_page = reinterpret_cast<BPlusTreeInternalPage<KeyType, page_id_t, KeyComparator>*>(buffer_pool_manager->FetchPage(parent_id));
+    auto parent_page = reinterpret_cast<BPlusTreeInternalPage<KeyType, page_id_t, KeyComparator>*>(buffer_pool_manager->FetchPage(parent_id)->GetData());
     int index = parent_page->ValueIndex(GetPageId());
     parent_page->SetKeyAt(index, array[0].first);
     buffer_pool_manager->UnpinPage(parent_id, true);
@@ -263,7 +264,7 @@ namespace cmudb {
     page_id_t parent_id = GetParentPageId();
     assert(parent_id == recipient->GetParentPageId());
     assert(parent_id != INVALID_PAGE_ID);
-    auto parent_page = reinterpret_cast<BPlusTreeInternalPage<KeyType, page_id_t, KeyComparator>*>(buffer_pool_manager->FetchPage(parent_id));
+    auto parent_page = reinterpret_cast<BPlusTreeInternalPage<KeyType, page_id_t, KeyComparator>*>(buffer_pool_manager->FetchPage(parent_id)->GetData());
     int index = parent_page->ValueIndex(recipient->GetPageId());
     recipient->CopyFirstFrom(array[GetSize()-1], index, buffer_pool_manager); 
     IncreaseSize(-1);
@@ -283,7 +284,7 @@ namespace cmudb {
     array[0] = item;
     IncreaseSize(1);
     
-    auto parent_page = reinterpret_cast<BPlusTreeInternalPage<KeyType, page_id_t, KeyComparator>*>(buffer_pool_manager->FetchPage(parent_id));
+    auto parent_page = reinterpret_cast<BPlusTreeInternalPage<KeyType, page_id_t, KeyComparator>*>(buffer_pool_manager->FetchPage(parent_id)->GetData());
     parent_page->SetKeyAt(parentIndex, array[0].first);
     buffer_pool_manager->UnpinPage(parent_id, true);
   }

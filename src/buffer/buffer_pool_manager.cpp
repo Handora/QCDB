@@ -55,7 +55,7 @@ Page *BufferPoolManager::FetchPage(page_id_t page_id) {
   // if exist, pin the page and return immediately
   if (ok) {
     if (page->pin_count_ == 0)
-      replacer_->Erase(page);
+      replacer_->Erase(page); 
     page->pin_count_ += 1;
     return page;
   }
@@ -94,6 +94,7 @@ Page *BufferPoolManager::FetchPage(page_id_t page_id) {
 bool BufferPoolManager::UnpinPage(page_id_t page_id, bool is_dirty) {
   assert(page_id != INVALID_PAGE_ID);
   std::lock_guard<std::mutex> latch(latch_);
+  
   Page *page = nullptr;
   bool ok = page_table_->Find(page_id, page);
   if (ok && page->pin_count_ > 0) {
