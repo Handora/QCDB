@@ -172,10 +172,10 @@ namespace cmudb {
 
     std::vector<std::pair<int64_t, bool>> keys;
     for (int i=0; i<10000; i++) {
-      std::default_random_engine generator;
-      std::uniform_int_distribution<int> distribution(0,1);
-      int dice_roll = distribution(generator); 
-      keys.push_back({i, dice_roll});
+      srand((unsigned)time(0)+i);
+      int d;
+      d = (rand()%2); 
+      keys.push_back({i, d});
     }
 
     // insert phase

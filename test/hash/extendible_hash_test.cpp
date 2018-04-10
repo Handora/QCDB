@@ -73,6 +73,33 @@ TEST(ExtendibleHashTest, SampleTest) {
 
     delete test;
   }
+
+  TEST(ExtendibleHashTest, RandomInsertAndDeleteTest) {
+    // set leaf size as 2
+    ExtendibleHash<int, int> *test =
+      new ExtendibleHash<int, int>(10);
+
+    for (int i=0; i<1000; i++) {
+      test->Insert(i, i);
+    }
+
+    for (int i=0; i<1000; i++) {
+      srand(time(0)+i);
+      if (rand()%2==0) {
+	test->Remove(i);
+	int value;
+	EXPECT_NE(test->Find(i, value), true);
+      } else {
+	test->Insert(i, i+2);
+	int value;
+	EXPECT_EQ(test->Find(i, value), true);
+	EXPECT_EQ(value, i+2);
+      }
+    }
+
+    delete test;
+  }
+
   
 
   TEST(ExtendibleHashTest, ConcurrentInsertTest) {

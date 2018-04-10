@@ -134,7 +134,7 @@ TEST(BPlusTreeTests, InsertTest2) {
        ++iterator) {
     auto location = (*iterator).second;
     EXPECT_EQ(location.GetPageId(), 0);
-    EXPECT_EQ(location.GetSlotNum(), current_key);
+    EXPECT_EQ(location.GetSlotNum(), current_key); 
     current_key = current_key + 1;
   }
 
@@ -278,18 +278,18 @@ TEST(BPlusTreeTests, DeleteTest2) {
     current_key = current_key + 1;
   }
 
-  EXPECT_EQ(current_key, keys.size() + 1);
-
+  EXPECT_EQ(current_key, keys.size() + 1); 
+  
   std::vector<int64_t> remove_keys = {1, 5, 3, 4};
   for (auto key : remove_keys) {
     index_key.SetFromInteger(key);
-    tree.Remove(index_key, transaction);
+    tree.Remove(index_key, transaction); 
   }
-
+  
   start_key = 2;
   current_key = start_key;
   int64_t size = 0;
-  index_key.SetFromInteger(start_key);
+  index_key.SetFromInteger(start_key); 
   for (auto iterator = tree.Begin(index_key); iterator.isEnd() == false;
        ++iterator) {
     auto location = (*iterator).second;

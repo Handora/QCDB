@@ -6,6 +6,7 @@
 
 #include "common/exception.h"
 #include "common/rid.h"
+#include "common/logger.h"
 #include "page/b_plus_tree_leaf_page.h"
 #include "page/b_plus_tree_internal_page.h"
 
@@ -126,6 +127,8 @@ namespace cmudb {
     int origin_size = GetSize();
     SetSize(GetSize()/2);
     recipient->CopyHalfFrom(array+GetSize(), origin_size-GetSize());
+    recipient->SetNextPageId(GetNextPageId());
+    SetNextPageId(recipient->GetPageId());
   }
 
   INDEX_TEMPLATE_ARGUMENTS
@@ -328,21 +331,25 @@ namespace cmudb {
     KeyType prev_key = array[1].first;
     
     if (lower_bound != nullptr && comparator(*lower_bound, prev_key) > 0) {
+      LOG_DEBUG("lower than lower bound");
       return false;
     }
 
     for (int i=2; i<GetSize(); i++) {
       if (comparator(prev_key, array[i].first) >= 0) {
+	LOG_DEBUG("lower than the prev one");
 	return false;
       }
       prev_key = array[i].first;
     }
 
     if (higher_bound != nullptr && comparator(prev_key, *higher_bound) >= 0) {
+      LOG_DEBUG("higher than higher bound"); 
       return false;
     }
 
     if (!IsRootPage() && GetSize() < GetMaxSize() / 2) {
+      LOG_DEBUG("lower than half size");
       return false;
     }
 
@@ -352,12 +359,12 @@ namespace cmudb {
 
   template class BPlusTreeLeafPage<GenericKey<4>, RID,
                                        GenericComparator<4>>;
-template class BPlusTreeLeafPage<GenericKey<8>, RID,
-                                       GenericComparator<8>>;
-template class BPlusTreeLeafPage<GenericKey<16>, RID,
-                                       GenericComparator<16>>;
-template class BPlusTreeLeafPage<GenericKey<32>, RID,
-                                       GenericComparator<32>>;
-template class BPlusTreeLeafPage<GenericKey<64>, RID,
-                                       GenericComparator<64>>;
+  template class BPlusTreeLeafPage<GenericKey<8>, RID,
+				   GenericComparator<8>>;
+  template class BPlusTreeLeafPage<GenericKey<16>, RID,
+				   GenericComparator<16>>;
+  template class BPlusTreeLeafPage<GenericKey<32>, RID,
+				   GenericComparator<32>>;
+  template class BPlusTreeLeafPage<GenericKey<64>, RID,
+				   GenericComparator<64>>;
 } // namespace cmudb

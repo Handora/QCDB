@@ -68,18 +68,17 @@ Page *BufferPoolManager::FetchPage(page_id_t page_id) {
     // find from lru replacer 
     bool ok = replacer_->Victim(page);
     if (!ok) {
-      // all page are pinned
+      // all page are pinned 
       return nullptr;
     }
-    page_table_->Remove(page->page_id_);
+    page_table_->Remove(page_id);
     if (page->is_dirty_) {
-      disk_manager_->WritePage(page->page_id_, page->data_);
+      disk_manager_->WritePage(page_id, page->data_);
     } 
   }
   
   page->is_dirty_ = false; 
-  page->pin_count_ = 1;
-  page->page_id_ = page_id;
+  page->pin_count_ = 1; 
   disk_manager_->ReadPage(page_id, page->data_);
   page_table_->Insert(page_id, page); 
   return page;
@@ -144,7 +143,6 @@ bool BufferPoolManager::DeletePage(page_id_t page_id) {
 
   if (ok && page->pin_count_ == 0) {
     page->is_dirty_ = false; 
-    page->page_id_ = INVALID_PAGE_ID; 
     page_table_->Remove(page_id);
     free_list_->push_back(page);
     disk_manager_->DeallocatePage(page_id);
@@ -178,17 +176,16 @@ Page *BufferPoolManager::NewPage(page_id_t &page_id) {
     // find from lru replacer 
     bool ok = replacer_->Victim(page);
     if (!ok) {
-      // all page are pinned
+      // all page are pinned 
       return nullptr;
     }
-    page_table_->Remove(page->page_id_);
+    page_table_->Remove(page_id); 
     if (page->is_dirty_) {
-      disk_manager_->WritePage(page->page_id_, page->data_);
+      disk_manager_->WritePage(page_id, page->data_);
     } 
   } 
   page->is_dirty_ = true; 
-  page->pin_count_ = 1;
-  page->page_id_ = page_id; 
+  page->pin_count_ = 1; 
   page_table_->Insert(page_id, page);
   memset(page->data_, 0, PAGE_SIZE);
   return page;
