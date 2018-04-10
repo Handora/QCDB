@@ -32,7 +32,7 @@ namespace cmudb {
 
     std::vector<int64_t> keys;
     
-    for (int i=0; i<10000; i++) {
+    for (int i=0; i<1000; i++) {
       keys.push_back(i);
     }
 
@@ -40,17 +40,17 @@ namespace cmudb {
       int64_t value = key & 0xFFFFFFFF;
       rid.Set((int32_t)(key >> 32), value);
       index_key.SetFromInteger(key);
-        if (key == 705) {
+      if (key == 705) {
 
-            std::cout << 1;
-        }
+	std::cout << 1;
+      }
 
       std::string prev = tree.ToString(true);
 
       tree.Insert(index_key, rid, transaction);
     }
 
-    // std::cout << tree.ToString(true);
+    std::cout << tree.ToString(true);
 
     EXPECT_EQ(1, bpm->PinnedNum());
     EXPECT_EQ(true, tree.CheckIntegrity());

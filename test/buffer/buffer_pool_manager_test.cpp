@@ -36,6 +36,7 @@ TEST(BufferPoolManagerTest, SampleTest) {
   for (int i = 0; i < 5; ++i) {
     EXPECT_EQ(true, bpm.UnpinPage(i, true));
   }
+  
   // we have 5 empty slots in LRU list, evict page zero out of buffer pool
   for (int i = 10; i < 14; ++i) {
     EXPECT_NE(nullptr, bpm.NewPage(temp_page_id));

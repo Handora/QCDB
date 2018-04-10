@@ -21,6 +21,7 @@ BufferPoolManager::BufferPoolManager(size_t pool_size,
   // put all the pages into free list
   for (size_t i = 0; i < pool_size_; ++i) {
     free_list_->push_back(&pages_[i]);
+    pages_[i].is_dirty_ = false;
   }
 }
 
@@ -71,14 +72,17 @@ Page *BufferPoolManager::FetchPage(page_id_t page_id) {
       // all page are pinned 
       return nullptr;
     }
-    page_table_->Remove(page_id);
-    if (page->is_dirty_) {
-      disk_manager_->WritePage(page_id, page->data_);
-    } 
+    page_table_->Remove(page->page_id_);
+  }
+
+
+  if (page->is_dirty_) {
+    disk_manager_->WritePage(page->page_id_, page->data_);
   }
   
   page->is_dirty_ = false; 
-  page->pin_count_ = 1; 
+  page->pin_count_ = 1;
+  page->page_id_ = page_id;
   disk_manager_->ReadPage(page_id, page->data_);
   page_table_->Insert(page_id, page); 
   return page;
@@ -97,12 +101,12 @@ bool BufferPoolManager::UnpinPage(page_id_t page_id, bool is_dirty) {
   Page *page = nullptr;
   bool ok = page_table_->Find(page_id, page);
   if (ok && page->pin_count_ > 0) {
-    if (--page->pin_count_ == 0) {
-      replacer_->Insert(page);
-    }
     if (is_dirty) {
       page->is_dirty_ = is_dirty;
     }
+    if (--page->pin_count_ == 0) {
+      replacer_->Insert(page);
+    } 
     return true;
   }
   return false;
@@ -121,7 +125,7 @@ bool BufferPoolManager::FlushPage(page_id_t page_id) {
   bool ok = page_table_->Find(page_id, page);
 
   if (ok) {
-    disk_manager_->WritePage(page_id, page->data_);
+    disk_manager_->WritePage(page->page_id_, page->data_);
     return true;
   }
   return false;
@@ -143,8 +147,9 @@ bool BufferPoolManager::DeletePage(page_id_t page_id) {
 
   if (ok && page->pin_count_ == 0) {
     page->is_dirty_ = false; 
-    page_table_->Remove(page_id);
+    page_table_->Remove(page->page_id_);
     free_list_->push_back(page);
+    replacer_->Erase(page);
     disk_manager_->DeallocatePage(page_id);
     return true;
   } else if (!ok) {
@@ -172,6 +177,9 @@ Page *BufferPoolManager::NewPage(page_id_t &page_id) {
     // find from free list
     page = free_list_->front();
     free_list_->pop_front();
+    if (page->is_dirty_) {
+      disk_manager_->WritePage(page->page_id_, page->data_); 
+    }
   } else {
     // find from lru replacer 
     bool ok = replacer_->Victim(page);
@@ -179,13 +187,15 @@ Page *BufferPoolManager::NewPage(page_id_t &page_id) {
       // all page are pinned 
       return nullptr;
     }
-    page_table_->Remove(page_id); 
+
+    page_table_->Remove(page->page_id_);
     if (page->is_dirty_) {
-      disk_manager_->WritePage(page_id, page->data_);
+      disk_manager_->WritePage(page->page_id_, page->data_);
     } 
   } 
   page->is_dirty_ = true; 
-  page->pin_count_ = 1; 
+  page->pin_count_ = 1;
+  page->page_id_ = page_id;
   page_table_->Insert(page_id, page);
   memset(page->data_, 0, PAGE_SIZE);
   return page;
