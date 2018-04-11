@@ -158,7 +158,7 @@ namespace cmudb {
     GenericComparator<8> comparator(key_schema);
 
     DiskManager *disk_manager = new DiskManager("test.db");
-    BufferPoolManager *bpm = new BufferPoolManager(5000, disk_manager);
+    BufferPoolManager *bpm = new BufferPoolManager(50, disk_manager);
 
     BPlusTree<GenericKey<8>, RID, GenericComparator<8>> tree("foo_pk", bpm, comparator);
 
@@ -194,14 +194,22 @@ namespace cmudb {
     for (auto item: keys) {
       auto key = item.first;
       auto deleted = item.second;
-      index_key.SetFromInteger(key);
+      index_key.SetFromInteger(key); 
       if (deleted) {
-  	tree.Remove(index_key, transaction);
+	auto prev = tree.ToString(true);
+	tree.Remove(index_key, transaction);
+	if (!tree.CheckIntegrity()) {
+	  std::cout << key;
+	  std::cout << tree.ToString(true) << std::endl;
+	  std::cout << prev << std::endl;
+	  return ;
+	}
       }
+      
     }
 
     EXPECT_EQ(tree.CheckIntegrity(), true);
-    EXPECT_EQ(1, bpm->PinnedNum());
+    EXPECT_EQ(1, bpm->PinnedNum()); 
 
     // find phase
     std::vector<RID> rids;
@@ -212,8 +220,8 @@ namespace cmudb {
       index_key.SetFromInteger(key);
       tree.GetValue(index_key, rids);
       if (deleted) {
-  	EXPECT_EQ(0, rids.size());
-  	continue;
+	EXPECT_EQ(0, rids.size());
+	continue;
       }
       
       EXPECT_EQ(rids.size(), 1);

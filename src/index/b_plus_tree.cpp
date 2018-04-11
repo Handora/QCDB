@@ -402,8 +402,11 @@ bool BPLUSTREE_TYPE::Coalesce(
 
   if (parent->IsRootPage()) {
     return AdjustRoot(parent); 
-  } 
-  return CoalesceOrRedistribute(parent);
+  }
+  if (parent->GetSize() >= parent->GetMinSize()) 
+    return CoalesceOrRedistribute(parent);
+  else
+    return false;
 }
 
 /*
