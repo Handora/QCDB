@@ -27,8 +27,8 @@ namespace cmudb {
     SetParentPageId(parent_id);
     SetSize(0);
     SetPageType(IndexPageType::LEAF_PAGE);
-    next_page_id_ = INVALID_PAGE_ID;
-    SetMaxSize((PAGE_SIZE-24)/(sizeof(KeyType)+sizeof(ValueType)));
+    next_page_id_ = INVALID_PAGE_ID; 
+    SetMaxSize((PAGE_SIZE-sizeof(BPlusTreeLeafPage))/(sizeof(KeyType)+sizeof(ValueType)));
   }
 
 /**
@@ -122,7 +122,7 @@ namespace cmudb {
   INDEX_TEMPLATE_ARGUMENTS
   void B_PLUS_TREE_LEAF_PAGE_TYPE::MoveHalfTo(
     BPlusTreeLeafPage *recipient,
-    __attribute__((unused)) BufferPoolManager *buffer_pool_manager) {
+    BufferPoolManager *buffer_pool_manager) {
     
     int origin_size = GetSize();
     SetSize(GetSize()/2);

@@ -163,9 +163,8 @@ namespace cmudb {
  */
     INDEX_TEMPLATE_ARGUMENTS
     template <typename N> N *BPLUSTREE_TYPE::Split(N *node) {
-      page_id_t new_page_id;
+      page_id_t new_page_id; 
       auto new_page = reinterpret_cast<N*>(buffer_pool_manager_->NewPage(new_page_id)->GetData());
-      
       new_page->Init(new_page_id, node->GetParentPageId());
       if (new_page == nullptr) {
 	throw "out of memory";
@@ -208,6 +207,7 @@ namespace cmudb {
 	UpdateRootPageId(); 
       } else {
 	auto parent_page = reinterpret_cast<BPlusTreeInternalPage<KeyType, page_id_t, KeyComparator>*>(buffer_pool_manager_->FetchPage(parent_page_id)->GetData());
+	
 	if (parent_page->GetSize() + 1 > parent_page->GetMaxSize()) {
 	  // if the parent page is overflow, we should recursively split
 	  auto new_page = Split(parent_page);
@@ -223,8 +223,17 @@ namespace cmudb {
 	  InsertIntoParent(parent_page, pop_key, new_page);
 	  buffer_pool_manager_->UnpinPage(new_page->GetPageId(), true);
 	} else {
-	  // just insert and return
-	  parent_page->InsertNodeAfter(old_node->GetPageId(), key, new_node->GetPageId()); 
+	  // just insert and return 
+	  buffer_pool_manager_->UnpinPage(parent_page_id, true);
+	  parent_page = reinterpret_cast<BPlusTreeInternalPage<KeyType, page_id_t, KeyComparator>*>(buffer_pool_manager_->FetchPage(parent_page_id)->GetData());
+	  
+	  buffer_pool_manager_->UnpinPage(parent_page_id, true);
+	  parent_page = reinterpret_cast<BPlusTreeInternalPage<KeyType, page_id_t, KeyComparator>*>(buffer_pool_manager_->FetchPage(parent_page_id)->GetData());
+
+	  parent_page->InsertNodeAfter(old_node->GetPageId(), key, new_node->GetPageId());
+	  buffer_pool_manager_->UnpinPage(parent_page_id, true);
+	  parent_page = reinterpret_cast<BPlusTreeInternalPage<KeyType, page_id_t, KeyComparator>*>(buffer_pool_manager_->FetchPage(parent_page_id)->GetData());
+
 	}  
       }
       buffer_pool_manager_->UnpinPage(parent_page_id, true);

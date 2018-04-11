@@ -24,7 +24,8 @@ void B_PLUS_TREE_INTERNAL_PAGE_TYPE::Init(page_id_t page_id,
   SetParentPageId(parent_id);
   SetPageType(IndexPageType::INTERNAL_PAGE);
   SetSize(0);
-  SetMaxSize((PAGE_SIZE - 20) / (sizeof(KeyType)+sizeof(ValueType)));
+
+  SetMaxSize((PAGE_SIZE - sizeof(BPlusTreeInternalPage)) / (sizeof(KeyType)+sizeof(ValueType)));
 }
 /*
  * Helper method to get/set the key associated with input "index"(a.k.a

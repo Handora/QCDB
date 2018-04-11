@@ -39,18 +39,11 @@ namespace cmudb {
     for (auto key : keys) {
       int64_t value = key & 0xFFFFFFFF;
       rid.Set((int32_t)(key >> 32), value);
-      index_key.SetFromInteger(key);
-      if (key == 705) {
+      index_key.SetFromInteger(key); 
 
-	std::cout << 1;
-      }
-
-      std::string prev = tree.ToString(true);
-
+      std::string prev  = tree.ToString(true);
       tree.Insert(index_key, rid, transaction);
     }
-
-    std::cout << tree.ToString(true);
 
     EXPECT_EQ(1, bpm->PinnedNum());
     EXPECT_EQ(true, tree.CheckIntegrity());

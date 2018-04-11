@@ -121,7 +121,8 @@ namespace cmudb {
    */
   template <typename K, typename V>
   void ExtendibleHash<K, V>::Insert(const K &key, const V &value) {
-    std::lock_guard<std::mutex> latch(global_table_lock_);
+    std::lock_guard<std::mutex> latch(global_table_lock_); 
+    
     std::hash<K> hasher{};
     while (true) {
       size_t bucket_id = hasher(key) % (1 << global_depth_);
