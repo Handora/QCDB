@@ -403,7 +403,7 @@ bool BPLUSTREE_TYPE::Coalesce(
   if (parent->IsRootPage()) {
     return AdjustRoot(parent); 
   }
-  if (parent->GetSize() >= parent->GetMinSize()) 
+  if (parent->GetSize() < parent->GetMinSize()) 
     return CoalesceOrRedistribute(parent);
   else
     return false;
@@ -440,14 +440,20 @@ void BPLUSTREE_TYPE::Redistribute(N *neighbor_node, N *node, int index) {
  */
 INDEX_TEMPLATE_ARGUMENTS
 bool BPLUSTREE_TYPE::AdjustRoot(BPlusTreePage *old_root_node) {
-  if ((old_root_node->IsLeafPage() && old_root_node->GetSize() >= 1) || old_root_node->GetSize() >= 2) {
+  assert(old_root_node->IsRootPage());
+  
+  if ((old_root_node->IsLeafPage() && old_root_node->GetSize() >= 1) || (!old_root_node->IsLeafPage() && old_root_node->GetSize() >= 2)) {
     return false;
   } else {
     if (old_root_node->IsLeafPage()) {
       root_page_id_ = INVALID_PAGE_ID;
     } else {
-      auto internal_page = static_cast<BPlusTreeInternalPage<KeyType, page_id_t, KeyComparator>*>(old_root_node);
+      auto internal_page = static_cast<BPlusTreeInternalPage<KeyType, page_id_t, KeyComparator>*>(old_root_node); 
       root_page_id_ = internal_page->ValueAt(0);
+      // refrsh the nwe root page to become the new parent.
+      auto new_root_page = reinterpret_cast<BPlusTreePage*>(buffer_pool_manager_->FetchPage(root_page_id_));
+      new_root_page->SetParentPageId(INVALID_PAGE_ID);
+      buffer_pool_manager_->UnpinPage(root_page_id_, true);
     }
     
     UpdateRootPageId(); 

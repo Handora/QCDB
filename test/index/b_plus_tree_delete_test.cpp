@@ -79,6 +79,14 @@ namespace cmudb {
       int64_t value = key & 0xFFFFFFFF; 
       EXPECT_EQ(rids[0].GetSlotNum(), value);
     }
+
+    bpm->UnpinPage(HEADER_PAGE_ID, true);
+    EXPECT_EQ(0, bpm->PinnedNum());
+    delete transaction;
+    delete disk_manager;
+    delete bpm;
+    remove("test.db");
+    remove("test.log");
   }
   
   TEST(BPlusTreeDeleteTests, RandomDeleteTest) {
@@ -123,12 +131,20 @@ namespace cmudb {
     for (auto item: keys) {
       auto key = item.first;
       auto deleted = item.second;
-      index_key.SetFromInteger(key); 
+      index_key.SetFromInteger(key);
+      // std::string prev = tree.ToString(true);
       if (deleted) {
 	// std::cout << bpm->PinnedNum() << std::endl;
 	tree.Remove(index_key, transaction);
 	// std::cout << bpm->PinnedNum() << std::endl;
-      } 
+      }
+      // if (!tree.CheckIntegrity()) {
+      // 	std::cout << "The deleted one is: " << std::endl;
+      // 	std::cout << key << std::endl;
+      // 	std::cout << prev << std::endl;
+      // 	std::cout << tree.ToString(true) << std::endl;
+      // 	return ;
+      // }
     }
 
     EXPECT_EQ(tree.CheckIntegrity(), true);
@@ -151,6 +167,14 @@ namespace cmudb {
       int64_t value = key & 0xFFFFFFFF; 
       EXPECT_EQ(rids[0].GetSlotNum(), value);
     }
+
+    bpm->UnpinPage(HEADER_PAGE_ID, true);
+    EXPECT_EQ(0, bpm->PinnedNum());
+    delete transaction;
+    delete disk_manager;
+    delete bpm;
+    remove("test.db");
+    remove("test.log");
   }
   
   TEST(BPlusTreeDeleteTests, BigRandomDeleteTest) {
@@ -194,18 +218,21 @@ namespace cmudb {
     for (auto item: keys) {
       auto key = item.first;
       auto deleted = item.second;
-      index_key.SetFromInteger(key); 
-      if (deleted) {
-	auto prev = tree.ToString(true);
-	tree.Remove(index_key, transaction);
-	if (!tree.CheckIntegrity()) {
-	  std::cout << key;
-	  std::cout << tree.ToString(true) << std::endl;
-	  std::cout << prev << std::endl;
-	  return ;
-	}
-      }
+      index_key.SetFromInteger(key);
       
+      if (deleted) {
+	// std::cout << key << std::endl;
+	// std::string prev = tree.ToString(true);
+	tree.Remove(index_key, transaction);
+
+	// if (!tree.CheckIntegrity()) {
+	//   std::cout << "The deleted one is: " << std::endl; 
+	//   std::cout << key << std::endl;
+	//   std::cout << prev << std::endl;
+	//   std::cout << tree.ToString(true) << std::endl;
+	//   return ;
+	// }
+      }
     }
 
     EXPECT_EQ(tree.CheckIntegrity(), true);
@@ -220,13 +247,21 @@ namespace cmudb {
       index_key.SetFromInteger(key);
       tree.GetValue(index_key, rids);
       if (deleted) {
-	EXPECT_EQ(0, rids.size());
-	continue;
+  	EXPECT_EQ(0, rids.size());
+  	continue;
       }
       
       EXPECT_EQ(rids.size(), 1);
       int64_t value = key & 0xFFFFFFFF; 
       EXPECT_EQ(rids[0].GetSlotNum(), value);
     }
+
+    bpm->UnpinPage(HEADER_PAGE_ID, true);
+    EXPECT_EQ(0, bpm->PinnedNum());
+    delete transaction;
+    delete disk_manager;
+    delete bpm;
+    remove("test.db");
+    remove("test.log");
   } 
 }

@@ -288,8 +288,8 @@ B_PLUS_TREE_INTERNAL_PAGE_TYPE::Lookup(const KeyType &key,
  */
   INDEX_TEMPLATE_ARGUMENTS
   void B_PLUS_TREE_INTERNAL_PAGE_TYPE::MoveLastToFrontOf(
-    BPlusTreeInternalPage *recipient, int parent_index,
-      BufferPoolManager *buffer_pool_manager) {
+    BPlusTreeInternalPage *recipient, int,
+    BufferPoolManager *buffer_pool_manager) {
     page_id_t parent_id = recipient->GetParentPageId();
     assert(parent_id == GetParentPageId());
     assert(parent_id != INVALID_PAGE_ID);
@@ -300,11 +300,12 @@ B_PLUS_TREE_INTERNAL_PAGE_TYPE::Lookup(const KeyType &key,
     int recipient_index = parent_page->ValueIndex(recipient->GetPageId());
 
     assert(this_index != -1 && recipient_index != -1 && recipient_index == this_index+1);
-    recipient->CopyFirstFrom({parent_page->KeyAt(this_index), array[GetSize()-1].second}, recipient_index, buffer_pool_manager);
+    recipient->CopyFirstFrom({parent_page->KeyAt(recipient_index), array[GetSize()-1].second}, recipient_index, buffer_pool_manager);
     
     // just for removing the warnings
-    if (this_index > recipient_index)
-      parent_page->SetKeyAt(this_index, array[GetSize()-1].first);
+    
+    if (this_index + 1 == recipient_index)
+      parent_page->SetKeyAt(recipient_index, array[GetSize()-1].first);
 
     IncreaseSize(-1);
     buffer_pool_manager->UnpinPage(parent_id, true);

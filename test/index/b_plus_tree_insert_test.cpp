@@ -32,7 +32,7 @@ namespace cmudb {
 
     std::vector<int64_t> keys;
     
-    for (int i=0; i<1000; i++) {
+    for (int i=0; i<10000; i++) {
       keys.push_back(i);
     }
 
@@ -41,7 +41,6 @@ namespace cmudb {
       rid.Set((int32_t)(key >> 32), value);
       index_key.SetFromInteger(key); 
 
-      std::string prev  = tree.ToString(true);
       tree.Insert(index_key, rid, transaction);
     }
 
