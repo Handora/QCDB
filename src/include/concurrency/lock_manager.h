@@ -19,6 +19,21 @@ namespace cmudb {
 
 class LockManager {
 
+  enum class LockType{ EMPTY, SHARED, EXCLUSIVE };
+
+  struct TransactionInfo
+  {
+    Transaction* txn_;
+    bool grated_;
+    LockType lock_type_;
+  }; 
+
+  struct LockList
+  {
+    std::list<TransactionInfo> lock_list_;
+    LockType lock_type_;
+  };
+
 public:
   LockManager(bool strict_2PL) : strict_2PL_(strict_2PL){};
 
@@ -39,6 +54,10 @@ public:
 
 private:
   bool strict_2PL_;
+
+  std::unordered_map<RID, LockList> lock_table_;
+  std::mutex lock_table_latch_;
+  std::condition_variable condition_;
 };
 
 } // namespace cmudb
