@@ -19,7 +19,7 @@ namespace cmudb {
 
 class LockManager {
 
-  enum class LockType{ EMPTY, SHARED, EXCLUSIVE };
+  enum class LockType{ EMPTY, SHARED, EXCLUSIVE, UPDATE };
 
   struct TransactionInfo
   {
@@ -30,8 +30,7 @@ class LockManager {
 
   struct LockList
   {
-    std::list<TransactionInfo> lock_list_;
-    LockType lock_type_;
+    std::list<TransactionInfo> lock_list_; 
   };
 
 public:
@@ -51,8 +50,10 @@ public:
   // release the lock hold by the txn
   bool Unlock(Transaction *txn, const RID &rid);
   /*** END OF APIs ***/
-
+  
 private:
+  bool CheckForWaitDie(Transaction *txn, const RID &rid);
+  
   bool strict_2PL_;
 
   std::unordered_map<RID, LockList> lock_table_;
