@@ -25,18 +25,19 @@ namespace cmudb {
 	lock_table_.insert({rid, LockList()});
       }
       
-      res_itr->second.lock_list_.push_back({txn, true, LockType::SHARED}); 
+      res_itr->second.lock_list_.push_back({txn, true, LockType::SHARED, std::promise<bool>()}); 
       txn->GetSharedLockSet()->insert(rid);
       return true;
     } else {
       // if there are some txns waiting while the state is SHARED
       if (res_itr->second.lock_list_.front().lock_type_ == LockType::SHARED) {
-
+	// while some other one is also waiting for the lock
 	if (!res_itr->second.lock_list_.back().grated_) {
 	  bool ok = CheckForWaitDie(txn, rid);
 	  if (ok) {
-	    res_itr->second.lock_list_.push_back({txn, false, LockType::SHARED});
+	    res_itr->second.lock_list_.push_back({txn, false, LockType::SHARED, std::promise<bool>()});
 	  } else {
+	    txn->SetState(TransactionState::ABORTED);
 	    return false;
 	  }
 	} else {

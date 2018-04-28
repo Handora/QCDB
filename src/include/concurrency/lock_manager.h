@@ -11,6 +11,7 @@
 #include <memory>
 #include <mutex>
 #include <unordered_map>
+#include <future>
 
 #include "common/rid.h"
 #include "concurrency/transaction.h"
@@ -26,6 +27,7 @@ class LockManager {
     Transaction* txn_;
     bool grated_;
     LockType lock_type_;
+    std::promise<bool> promise_;
   }; 
 
   struct LockList
