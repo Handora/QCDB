@@ -27,12 +27,13 @@ class LockManager {
     Transaction* txn_;
     bool grated_;
     LockType lock_type_;
-    std::promise<bool> promise_;
+    std::shared_ptr<std::promise<bool>> promise_;
   }; 
 
   struct LockList
   {
-    std::list<TransactionInfo> lock_list_; 
+    std::list<TransactionInfo> lock_list_;
+    LockList() { lock_list_.clear(); }
   };
 
 public:
@@ -52,15 +53,20 @@ public:
   // release the lock hold by the txn
   bool Unlock(Transaction *txn, const RID &rid);
   /*** END OF APIs ***/
+
+  // test only
+  // is there are no lock is granted or waiting for granting
+  bool IsClean();
+  bool IsClean(Transaction *txn);
+  void ShowLock();
   
 private:
   bool CheckForWaitDie(Transaction *txn, const RID &rid);
   
   bool strict_2PL_;
 
-  std::unordered_map<RID, LockList> lock_table_;
-  std::mutex lock_table_latch_;
-  std::condition_variable condition_;
+  std::unordered_map<RID, std::shared_ptr<LockList>> lock_table_;
+  std::mutex lock_table_latch_; 
 };
 
 } // namespace cmudb
