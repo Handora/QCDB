@@ -27,7 +27,7 @@ class LockManager {
     Transaction* txn_;
     bool grated_;
     LockType lock_type_;
-    std::shared_ptr<std::promise<bool>> promise_;
+    std::unique_ptr<std::promise<bool>> promise_;
   }; 
 
   struct LockList

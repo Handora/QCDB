@@ -29,17 +29,16 @@ namespace cmudb {
 	EXPECT_EQ(res, true);
 	EXPECT_EQ(txn.GetState(), TransactionState::GROWING);
 	txn_mgr.Commit(&txn);
-	EXPECT_EQ(txn.GetState(), TransactionState::COMMITTED);
+	EXPECT_EQ(txn.GetState(), TransactionState::COMMITTED); 
       });
 
-    std::thread t1([&] {
-      
+    std::thread t1([&] {      
 	Transaction txn(1); 
 	bool res = lock_mgr.LockShared(&txn, rid); 
 	EXPECT_EQ(res, true);
 	EXPECT_EQ(txn.GetState(), TransactionState::GROWING);
 	txn_mgr.Commit(&txn);
-	EXPECT_EQ(txn.GetState(), TransactionState::COMMITTED);
+	EXPECT_EQ(txn.GetState(), TransactionState::COMMITTED); 
       });
 
     t0.join();
@@ -130,7 +129,7 @@ namespace cmudb {
 	} 
 	EXPECT_EQ(txn.GetState(), TransactionState::GROWING);
 	
-	txn_mgr.Commit(&txn);
+	txn_mgr.Commit(&txn); 
 	EXPECT_EQ(txn.GetState(), TransactionState::COMMITTED);
 	EXPECT_EQ(10, txn.GetExclusiveLockSet()->size()); 
       });
@@ -142,28 +141,72 @@ namespace cmudb {
 	for (auto i: new_order) {
 	  rids.push_back(RID(i, i));
 	}
-      
-	Transaction txn(1);
 
       Again:
-	txn.SetState(TransactionState::GROWING);
+	Transaction txn(1); 
 	for (auto rid: rids) {
 	  bool res = lock_mgr.LockExclusive(&txn, rid); 
 	  if (res == false) {
-	    txn_mgr.Abort(&txn);
+	    txn_mgr.Abort(&txn); 
 	    goto Again;
 	  }
-	}
+	} 
 	
 	EXPECT_EQ(txn.GetState(), TransactionState::GROWING);
 	txn_mgr.Commit(&txn);
 	EXPECT_EQ(txn.GetState(), TransactionState::COMMITTED);
-	EXPECT_EQ(10, txn.GetSharedLockSet()->size());
+	EXPECT_EQ(10, txn.GetExclusiveLockSet()->size());
       });
 
     t0.join();
     t1.join();
-    EXPECT_EQ(0, lock_mgr.IsClean());
+    EXPECT_EQ(true, lock_mgr.IsClean());
   }
+
+  TEST(LockManagerTest, SuperExclusiveTest) {
+  
+    LockManager lock_mgr{false}; 
+    TransactionManager txn_mgr{&lock_mgr};
+    std::vector<int> order;
+    std::vector<std::thread> thread_vec;
+    for (int i=0; i<1000; i++) {
+      order.push_back(i);
+    }
+
+    for (int i=0; i<10; i++) {
+      thread_vec.push_back(std::thread([&] {
+	    auto new_order = order;
+	    std::random_shuffle(new_order.begin(), new_order.end());
+	    std::vector<RID> rids;
+	    for (auto x: new_order) {
+	      rids.push_back(RID(x, x));
+	    }
+
+	  Again:
+	    Transaction txn(i) ;
+
+	    // according to WAIT-DIE, txn0 should not be broken
+	    for (auto rid: rids) {
+	      bool res = lock_mgr.LockExclusive(&txn, rid); 
+              if (!res) {
+		txn_mgr.Abort(&txn);
+		goto Again;
+	      }
+	    } 
+	    EXPECT_EQ(txn.GetState(), TransactionState::GROWING);
+	
+	    txn_mgr.Commit(&txn); 
+	    EXPECT_EQ(txn.GetState(), TransactionState::COMMITTED);
+	    EXPECT_EQ(1000, txn.GetExclusiveLockSet()->size()); 
+	  }));
+    }
+    
+    
+    for (int i=0; i<10; i++) {
+      thread_vec[i].join();
+    }
+    EXPECT_EQ(true, lock_mgr.IsClean());
+  }
+
   
 } // namespace cmudb
