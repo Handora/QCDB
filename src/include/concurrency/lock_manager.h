@@ -20,7 +20,7 @@ namespace cmudb {
 
 class LockManager {
 
-  enum class LockType{ EMPTY, SHARED, EXCLUSIVE, UPDATE };
+  enum class LockType{ EMPTY, SHARED, EXCLUSIVE, UPDATE, DELETE };
 
   struct TransactionInfo
   {
@@ -33,7 +33,10 @@ class LockManager {
   struct LockList
   {
     std::list<TransactionInfo> lock_list_;
-    LockList() { lock_list_.clear(); }
+    LockList(): list_lock_type_(LockType::EMPTY),
+		list_grant_cnt_(0) {};
+    LockType list_lock_type_;
+    int list_grant_cnt_;
   };
 
 public:
