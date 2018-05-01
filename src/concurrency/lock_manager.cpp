@@ -23,7 +23,7 @@ namespace cmudb {
 
     auto res_itr = lock_table_.find(rid);
     if (res_itr == lock_table_.end() 
-	|| res_itr->second->list_grant_cnt_ == 0) {
+	|| res_itr->second->lock_list_.size() == 0) {
       // No lock is held, so we can require the lock
       if (res_itr == lock_table_.end()) {
 	lock_table_.insert({rid, std::make_shared<LockList>()});
@@ -68,7 +68,8 @@ namespace cmudb {
 
 	if (extensive_ptr->txn_ == txn) {
 	  // TODO(Handora): should we insert this txn to the list
-	  res_itr->second->list_grant_cnt_++;
+	  // res_itr->second->list_grant_cnt_++;
+	  LOG_DEBUG("Reentrant lock");
 	  return true;
 	}
 	
@@ -108,8 +109,8 @@ namespace cmudb {
     }
 
     auto res_itr = lock_table_.find(rid);
-    if (res_itr == lock_table_.end() 
-	|| res_itr->second->list_grant_cnt_ == 0) {
+    if (res_itr == lock_table_.end()
+	|| res_itr->second->lock_list_.size() == 0) {
       // No lock is held, so we can require the lock
       if (res_itr == lock_table_.end()) {
 	lock_table_.insert({rid, std::make_shared<LockList>()});
@@ -124,22 +125,26 @@ namespace cmudb {
       txn->GetExclusiveLockSet()->insert(rid);
       return true;
     } else {
-      if (res_itr->second->list_lock_type_ == LockType::EXCLUSIVE) {
-	auto extensive_ptr = res_itr->second->lock_list_.begin();
-	assert(extensive_ptr != res_itr->second->lock_list.end()
-	       && extensive_ptr->grated_ == true
-	       && extensive_ptr->lock_type_ == LockType::EXCLUSIVE);
 
-	if (extensive_ptr->txn_ == txn) {
-	  res_itr->second->list_grant_cnt_++;
+      // TODO(Handora): should we care about reentrant lock
+      
+      if (res_itr->second->list_lock_type_ == LockType::EXCLUSIVE) {
+      	auto extensive_ptr = res_itr->second->lock_list_.begin();
+      	assert(extensive_ptr != res_itr->second->lock_list.end()
+      	       && extensive_ptr->grated_ == true
+      	       && extensive_ptr->lock_type_ == LockType::EXCLUSIVE);
+
+      	if (extensive_ptr->txn_ == txn) {
+      	  // res_itr->second->list_grant_cnt_++;
+	  LOG_DEBUG("Reentrant lock");
 	  return true;
-	}
+      	}
       }
       
       // check for WAIT-DIE
       if (CheckForWaitDie(txn, rid)) {
 	// wait for notifying
-	res_itr->second->lock_list_.push_back({txn, false, LockType::EXCLUSIVE,\
+	res_itr->second->lock_list_.push_back({txn, false, LockType::EXCLUSIVE,	\
 	      std::make_shared<std::promise<bool>>()}); 
       } else {
 	// break the WAIT_DIE fule
@@ -168,42 +173,44 @@ namespace cmudb {
     
     auto res_itr = lock_table_.find(rid);
     assert(res_itr != lock_table_.end());
-    int all_shared = 0;
-    auto txn_info_itr = std::find_if(res_itr->second->lock_list_.begin(),
-				     res_itr->second->lock_list_.end(),
-				     [&](const TransactionInfo &elem) {
-				       return elem.txn_ == txn;
-				     });
 
-    // for removing the warning
-    if (txn_info_itr == res_itr->second->lock_list_.end())
-      assert(txn_info_itr != res_itr->second->lock_list_.end());
-    assert(txn_info_itr->grated_ == true && txn_info_itr->lock_type_ == LockType::SHARED);
+    auto res_list = res_itr->second->lock_list_;
+    assert(res_itr->second->lock_list_.size() != 0);
 
-    std::for_each(res_itr->second->lock_list_.begin(),
-		  res_itr->second->lock_list_.end(),
-		  [&](const TransactionInfo &elem) {
-		    if (elem.grated_)
-		      all_shared++;
-		  });
-
-    if (all_shared != 1) {
-      if (CheckForWaitDie(txn, rid)) {
-	res_itr->second->lock_list_.push_back({txn, false, LockType::UPDATE,
-	      std::make_shared<std::promise<bool>>()});
-	latch.unlock(); 
-	// wait until notify
-	res_itr->second->lock_list_.end()->promise_->get_future().get(); 
-      } else {
-	txn->SetState(TransactionState::ABORTED);
-	return false;
+    if (res_itr->second->list_lock_type_ == LockType::SHARED) {
+      if (res_itr->second->list_grant_cnt_ == 1) {
+	assert(res_list.begin()->txn_ == txn);
+	res_list.begin()->lock_type_ = LockType::EXCLUSIVE;
+	// res_itr->second->list_grant_cnt_++;
+	txn->GetSharedLockSet()->erase(rid);
+	txn->GetExclusiveLockSet()->insert(rid);
+	return true;
       }
+    }
+    
+    // x y x or y x x
+    // x y x is not possible while y x x is possible
+
+    if (CheckForWaitDie(txn, rid)) {
+      res_list.push_back({txn, false, LockType::EXCLUSIVE,\
+	    std::make_shared<std::promise<bool>>()});
     } else {
-      txn_info_itr->lock_type_ = LockType::EXCLUSIVE; 
+      txn->SetState(TransactionState::ABORTED);
+      return false;
     }
 
-    // TODO(handora): this should be locked for RACE CONDITION
+    auto wait_ptr = res_itr->second->lock_list_.end();
+    latch.unlock();
+    // block for the waiting
+    // what the unlock should do is wake up and put the txn in the right place
+    wait_ptr->promise_->get_future().get();
+      
+    if (txn->GetState() == TransactionState::ABORTED) {
+      return false;
+    }
+
     txn->GetExclusiveLockSet()->insert(rid);
+    txn->GetSharedLockSet()->erase(rid);
     return true;
   }
 
@@ -226,85 +233,122 @@ namespace cmudb {
 		 [&](const TransactionInfo& elem) {
                    return elem.grated_ == true && elem.txn_ == txn;
 		 });
-
-    // there is a case that read is erased from list
-    if (txn_info_itr == res_list.end())
-      return true;
-      
-    if (txn_info_itr->lock_type_ == LockType::EXCLUSIVE) {
+    
+    assert(txn_info_itr == res_list.end());
+    res_itr->second->list_grant_cnt_--;
+    auto lock_type = txn_info_itr->lock_type_;
+    txn_info_itr->lock_type_ = LockType::DELETE;
+    if (lock_type == LockType::EXCLUSIVE) {
       std::cout << "EXclusive" << std::endl;
       flush(std::cout);
       // get the next one for doing if not null
+      assert(res_itr->second->list_grant_cnt_ == 0);
       auto next_txn_info_itr = txn_info_itr;
       next_txn_info_itr++;
+      
       if (next_txn_info_itr != res_list.end()) {
 	next_txn_info_itr->grated_ = true;
 	// notify the next one
 	next_txn_info_itr->promise_->set_value(true);
-
+	res_itr->second->list_grant_cnt_++;
+	res_itr->second->list_lock_type_ = next_txn_info_itr->lock_type_;
 	if (next_txn_info_itr->lock_type_ == LockType::SHARED) {
-	  next_txn_info_itr++;
-	  while (next_txn_info_itr != res_list.end()
-		 && next_txn_info_itr->lock_type_ == LockType::SHARED) {
-	    next_txn_info_itr->grated_ = true;
-	    // notify the next one
-	    next_txn_info_itr->promise_->set_value(true); 
-	  }
-	}
-      }
-    } else if (txn_info_itr->lock_type_ == LockType::SHARED) {
-      std::cout << "Shared" << std::endl;
-      flush(std::cout);
-      int shared_num =  std::count_if(res_list.begin(),
-				      res_list.end(),
-				      [&](const TransactionInfo &elem) {
-                                        return elem.grated_; 
-				      });
-      
-      if (shared_num == 1) {
-	std::cout << "Shared1" << std::endl;
-	flush(std::cout);
-	auto next_txn_info_itr = txn_info_itr;
-	next_txn_info_itr++;
-	if (next_txn_info_itr != res_list.end()) {
-	  next_txn_info_itr->grated_ = true;
-	  // notify the next one
-	  next_txn_info_itr->promise_->set_value(true);
+	  auto next_next_txn_info_itr = next_txn_info_itr;
+	  next_next_txn_info_itr++;
 
-	  if (next_txn_info_itr->lock_type_ == LockType::SHARED) {
+	  if (next_next_txn_info_itr != res_list.end() 
+	      && next_next_txn_info_itr->lock_type_ == LockType::EXCLUSIVE) {
+	    if (next_next_txn_info_itr->txn_ == next_txn_info_itr->txn_) {
+	      // the update part
+	      // TODO(Handora): may be there will be a race condition
+	      res_itr->second->list_lock_type_ = LockType::EXCLUSIVE; 
+	      next_txn_info_itr->lock_type_ = LockType::DELETE;
+	    } 
+	  } else {
 	    next_txn_info_itr++;
+	    
 	    while (next_txn_info_itr != res_list.end()
 		   && next_txn_info_itr->lock_type_ == LockType::SHARED) {
 	      next_txn_info_itr->grated_ = true;
 	      // notify the next one
+	      res_itr->second->list_grant_cnt_++;
 	      next_txn_info_itr->promise_->set_value(true); 
 	    }
 	  }
 	}
-      } else if (shared_num == 2) {
+      }
+    } else if (lock_type == LockType::SHARED) {
+      std::cout << "Shared" << std::endl;
+      flush(std::cout);
+      
+      if (res_itr->second->list_grant_cnt_ == 0) {
+	std::cout << "Shared1" << std::endl;
+	flush(std::cout);
+
+	// get the next one for doing if not null
+	assert(res_itr->second->list_grant_cnt_ == 0);
+	auto next_txn_info_itr = txn_info_itr;
+	next_txn_info_itr++;
+      
+	if (next_txn_info_itr != res_list.end()) {
+	  next_txn_info_itr->grated_ = true;
+	  // notify the next one
+	  next_txn_info_itr->promise_->set_value(true);
+	  res_itr->second->list_grant_cnt_++;
+	  res_itr->second->list_lock_type_ = next_txn_info_itr->lock_type_;
+	  if (next_txn_info_itr->lock_type_ == LockType::SHARED) {
+	    auto next_next_txn_info_itr = next_txn_info_itr;
+	    next_next_txn_info_itr++;
+
+	    if (next_next_txn_info_itr != res_list.end() 
+		&& next_next_txn_info_itr->lock_type_ == LockType::EXCLUSIVE) {
+	      if (next_next_txn_info_itr->txn_ == next_txn_info_itr->txn_) {
+		// the update part
+		// TODO(Handora): may be there will be a race condition
+		res_itr->second->list_lock_type_ = LockType::EXCLUSIVE; 
+		next_txn_info_itr->lock_type_ = LockType::DELETE;
+	      } 
+	    } else {
+	      next_txn_info_itr++;
+	    
+	      while (next_txn_info_itr != res_list.end()
+		     && next_txn_info_itr->lock_type_ == LockType::SHARED) {
+		next_txn_info_itr->grated_ = true;
+		// notify the next one
+		res_itr->second->list_grant_cnt_++;
+		next_txn_info_itr->promise_->set_value(true); 
+	      }
+	    }
+	  }
+	}
+      } else if (res_itr->second->list_grant_cnt_ == 1) {
 	std::cout << "Shared2" << std::endl;
 	flush(std::cout);
 	
 	auto next_txn_info_itr = txn_info_itr;
 	next_txn_info_itr++;
-	if (next_txn_info_itr != res_list.end() &&
-	    next_txn_info_itr->lock_type_ == LockType::UPDATE) {
+	if (next_txn_info_itr != res_list.end()
+	    && next_txn_info_itr->lock_type_ == LockType::EXCLUSIVE) {
 	  std::cout << "update" << std::endl;
 	  flush(std::cout);
 	  auto update_txn = find_if(res_list.begin(), res_list.end(),
 				    [&](const TransactionInfo&elem) {
 				      return elem.txn_ == next_txn_info_itr->txn_;
 				    });
-	  assert(update_txn != res_list.end());
-	  res_list.erase(update_txn);
+          update_txn->lock_type_ = LockType::EXCLUSIVE;
+          
 	  next_txn_info_itr->grated_ = true;
 	  next_txn_info_itr->lock_type_ = LockType::EXCLUSIVE;
+	  res_itr->second->list_lock_type_ = LockType::EXCLUSIVE; 
 	  next_txn_info_itr->promise_->set_value(true); 
 	}
       }
     }
     
-    res_list.erase(txn_info_itr); 
+
+    res_list.remove_if([](const TransactionInfo& elem) {
+	return elem.lock_type_ == LockType::DELETE;
+      });
     
     return true;
   }
@@ -321,7 +365,7 @@ namespace cmudb {
 /*
 ================================================================
                            TEST ONLY
-================================================================
+			   ================================================================
 */
 
   bool LockManager::IsClean() {
