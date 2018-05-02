@@ -103,6 +103,7 @@ namespace cmudb {
     // what the unlock should do is wake up and put the txn in the right place 
     assert(wait_ptr->promise_ != nullptr);
     wait_ptr->promise_->get_future().get();
+    wait_ptr->promise_ = nullptr;
     
     if (txn->GetState() == TransactionState::ABORTED) {
       // there is an abort happened
@@ -183,7 +184,8 @@ namespace cmudb {
       // what the unlock should do is wake up and put the txn in the right place
       assert(wait_ptr->promise_ != nullptr);
       
-      wait_ptr->promise_->get_future().get(); 
+      wait_ptr->promise_->get_future().get();
+      wait_ptr->promise_ = nullptr;
       
       if (txn->GetState() == TransactionState::ABORTED) {
 	return false;
@@ -253,6 +255,7 @@ namespace cmudb {
     // what the unlock should do is wake up and put the txn in the right place
     assert(wait_ptr->promise_ != nullptr);
     wait_ptr->promise_->get_future().get();
+    wait_ptr->promise_ = nullptr;
       
     if (txn->GetState() == TransactionState::ABORTED) {
       return false;
@@ -296,6 +299,7 @@ namespace cmudb {
     assert(txn_info_itr != res_itr->second->lock_list_.end());
 
     if (txn_info_itr->grated_ == false) {
+      assert(txn->GetState() == TransactionState::ABORTED);
       txn_info_itr->promise_->set_value(false);
       res_itr->second->lock_list_.erase(txn_info_itr);
       return true;
