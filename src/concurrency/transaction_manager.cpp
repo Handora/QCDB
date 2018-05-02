@@ -43,7 +43,7 @@ void TransactionManager::Commit(Transaction *txn) {
     lock_set.emplace(item);
   for (auto item : *txn->GetExclusiveLockSet())
     lock_set.emplace(item);
-  // release all the lock
+  // release all the lock 
   for (auto locked_rid : lock_set) {
     lock_manager_->Unlock(txn, locked_rid); 
   } 

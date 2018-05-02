@@ -62,6 +62,17 @@ public:
   bool IsClean();
   bool IsClean(Transaction *txn);
   void ShowLock();
+  void SayType(LockType type) {
+    if (type == LockType::SHARED) {
+      std::cout << "SHARED";
+    } else if (type == LockType::EXCLUSIVE) {
+      std::cout << "EXCLUSIVE";
+    } else if (type == LockType::DELETE) {
+      std::cout << "DELETE";
+    } else {
+      std::cout << "May be empty"; 
+    }
+  }
   
 private:
   bool CheckForWaitDie(Transaction *txn, const RID &rid);
