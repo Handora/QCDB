@@ -50,6 +50,7 @@ namespace cmudb {
       // 	std::cout << ")";
       // }
       // std::cout << std::endl;
+      // std::cout.flush();
       
       // if there are some txns waiting while the state is SHARED
       if (res_itr->second->list_lock_type_ == LockType::SHARED) {
@@ -73,7 +74,7 @@ namespace cmudb {
 	}
       } else {
 	// the first one must be the exclusive one
-        auto extensive_ptr = res_itr->second->lock_list_.begin(); 
+	auto extensive_ptr = res_itr->second->lock_list_.begin(); 
 	assert(extensive_ptr != res_itr->second->lock_list_.end()
 	       && extensive_ptr->grated_ == true
 	       && extensive_ptr->lock_type_ == LockType::EXCLUSIVE);
@@ -151,6 +152,7 @@ namespace cmudb {
       // 	std::cout << ")";
       // }
       // std::cout << std::endl;
+      // std::cout.flush();
       
       // TODO(Handora): should we care about reentrant lock
       // if (res_itr->second->list_lock_type_ == LockType::EXCLUSIVE) {
@@ -215,6 +217,7 @@ namespace cmudb {
     //   std::cout << ")";
     // }
     // std::cout << std::endl;
+    // std::cout.flush();
 
     if (res_itr->second->list_lock_type_ == LockType::SHARED) {
       if (res_itr->second->list_grant_cnt_ == 1) {
@@ -289,6 +292,7 @@ namespace cmudb {
     //   std::cout << ")";
     // }
     // std::cout << std::endl;
+    // std::cout.flush();
 
     auto txn_info_itr = std::find_if(res_itr->second->lock_list_.begin(),
 				     res_itr->second->lock_list_.end(),
@@ -300,8 +304,8 @@ namespace cmudb {
 
     if (txn_info_itr->grated_ == false) {
       assert(txn->GetState() == TransactionState::ABORTED);
-      txn_info_itr->promise_->set_value(false);
-      res_itr->second->lock_list_.erase(txn_info_itr);
+      txn_info_itr->promise_->set_value(false); 
+      res_itr->second->lock_list_.erase(txn_info_itr); 
       return true;
     }
     
@@ -345,7 +349,8 @@ namespace cmudb {
 	      next_txn_info_itr->grated_ = true;
 	      // notify the next one
 	      res_itr->second->list_grant_cnt_++;
-	      next_txn_info_itr->promise_->set_value(true); 
+	      next_txn_info_itr->promise_->set_value(true);
+	      next_txn_info_itr++;
 	    }
 	  }
 	}
@@ -389,7 +394,8 @@ namespace cmudb {
 		next_txn_info_itr->grated_ = true;
 		// notify the next one
 		res_itr->second->list_grant_cnt_++;
-		next_txn_info_itr->promise_->set_value(true); 
+		next_txn_info_itr->promise_->set_value(true);
+		next_txn_info_itr++;
 	      }
 	    }
 	  }
@@ -439,6 +445,7 @@ namespace cmudb {
     //   std::cout << ")";
     // }
     // std::cout << std::endl;
+    // std::cout.flush();
     
     return true;
   }
