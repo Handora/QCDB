@@ -12,14 +12,18 @@
 
 #include <queue>
 #include <vector>
+#include <mutex>
 
 #include "concurrency/transaction.h"
 #include "index/index_iterator.h"
 #include "page/b_plus_tree_internal_page.h"
 #include "page/b_plus_tree_leaf_page.h"
+#include "page/page.h"
 
 namespace cmudb {
 
+enum class BPlusTreeActionType { LookUp, Insert, Delete };  
+  
 #define BPLUSTREE_TYPE BPlusTree<KeyType, ValueType, KeyComparator>
 // Main class providing the API for the Interactive B+ Tree.
 INDEX_TEMPLATE_ARGUMENTS
@@ -61,8 +65,12 @@ public:
   void RemoveFromFile(const std::string &file_name,
                       Transaction *transaction = nullptr);
   // expose for test purpose
-  B_PLUS_TREE_LEAF_PAGE_TYPE *FindLeafPage(const KeyType &key,
-                                           bool leftMost = false);
+  Page *FindLeafPage(const KeyType &key,
+		     bool leftMost,
+		     Transaction* txn,
+		     BPlusTreeActionType type);
+
+  void ReleasePageSet(Transaction *txn, BPlusTreeActionType type, bool dirty);
 
   bool CheckIntegrity() const;
 
@@ -98,6 +106,7 @@ private:
   page_id_t root_page_id_;
   BufferPoolManager *buffer_pool_manager_;
   KeyComparator comparator_;
+  std::mutex root_id_latch_;
 };
 
 } // namespace cmudb
