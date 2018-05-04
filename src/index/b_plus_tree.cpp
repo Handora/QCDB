@@ -40,7 +40,8 @@ namespace cmudb {
    *****************************************************************************/
   INDEX_TEMPLATE_ARGUMENTS
   void BPLUSTREE_TYPE::ReleasePageSet(Transaction *txn, BPlusTreeActionType type, bool dirty) {
-    for (unsigned long i=0; i<txn->GetPageSet()->size(); i++) {
+    unsigned long size = txn->GetPageSet()->size();
+    for (unsigned long i=0; i<size; i++) {
       auto release_page = txn->GetPageSet()->front();
       if (type == BPlusTreeActionType::LookUp) {
 	release_page->RUnlatch();
@@ -77,14 +78,16 @@ namespace cmudb {
     ValueType value; 
     if (leaf_page->Lookup(key, value, comparator_)) {
       result.push_back(value);
-      page->RUnlatch(); 
-      transaction->GetPageSet()->pop_front(); 
+      page->RUnlatch();
+      if (transaction)
+	transaction->GetPageSet()->pop_front(); 
       buffer_pool_manager_->UnpinPage(leaf_page->GetPageId(), false);
       return true;
     }
 
     page->RUnlatch();
-    transaction->GetPageSet()->pop_front(); 
+    if (transaction)
+      transaction->GetPageSet()->pop_front(); 
     buffer_pool_manager_->UnpinPage(leaf_page->GetPageId(), false); 
     return false;
   }
@@ -102,7 +105,7 @@ namespace cmudb {
   INDEX_TEMPLATE_ARGUMENTS
   bool BPLUSTREE_TYPE::Insert(const KeyType &key, const ValueType &value,
 			      Transaction *transaction) {
-    // use this block to use lock
+    // use this block to use lock_guard
     {
       // for concurrent update
       std::lock_guard<std::mutex> latch(root_id_latch_);
@@ -112,10 +115,7 @@ namespace cmudb {
 	return true;
       }
     }
-    bool ok = InsertIntoLeaf(key, value);
-
-    // TODO(Handora): How operate more properly
-    ReleasePageSet(transaction, BPlusTreeActionType::Insert, true);
+    bool ok = InsertIntoLeaf(key, value, transaction);
     return ok;
   }
 /*
@@ -156,6 +156,11 @@ namespace cmudb {
     
     ValueType old_value;
     if (leaf_page->Lookup(key, old_value, comparator_)) {
+      // TODO(Handora): How operate more properly
+      if (transaction)
+	ReleasePageSet(transaction, BPlusTreeActionType::Insert, false); 
+      else
+	buffer_pool_manager_->UnpinPage(leaf_page->GetPageId(), false);
       return false;
     }
   
@@ -167,12 +172,16 @@ namespace cmudb {
       } else {
 	new_page->Insert(key, value, comparator_); 
       }
-      InsertIntoParent(leaf_page, pop_key, new_page);
+      InsertIntoParent(leaf_page, pop_key, new_page, transaction);
       buffer_pool_manager_->UnpinPage(new_page->GetPageId(), true);
     } else {
       leaf_page->Insert(key, value, comparator_);
     }
 
+    if (transaction)
+      ReleasePageSet(transaction, BPlusTreeActionType::Insert, true); 
+    else
+      buffer_pool_manager_->UnpinPage(leaf_page->GetPageId(), true);
     return true;
   }
 
@@ -243,7 +252,7 @@ namespace cmudb {
 	  new_page->InsertNodeAfter(old_node->GetPageId(), key, new_node->GetPageId());
 	  new_node->SetParentPageId(new_page->GetPageId());
 	}
-	InsertIntoParent(parent_page, pop_key, new_page);
+	InsertIntoParent(parent_page, pop_key, new_page, transaction);
 	buffer_pool_manager_->UnpinPage(new_page->GetPageId(), true);
       } else {
 	// just insert and return 
@@ -276,7 +285,7 @@ INDEX_TEMPLATE_ARGUMENTS
 void BPLUSTREE_TYPE::Remove(const KeyType &key, Transaction *transaction) {
   if (IsEmpty()) {
     return ;
-  }
+  } 
 
   // TODO(Handora): use static_cast instead of reinterpret_cast
   auto page = FindLeafPage(key, false, transaction, BPlusTreeActionType::Delete);
@@ -287,22 +296,36 @@ void BPLUSTREE_TYPE::Remove(const KeyType &key, Transaction *transaction) {
   // if page is the root
   if (leaf_page->IsRootPage()) {
     if (AdjustRoot(leaf_page)) {
-      transaction->GetDeletedPageSet()->insert(leaf_page->GetPageId()); 
+      if (transaction)
+	transaction->GetDeletedPageSet()->insert(leaf_page->GetPageId());
+      else
+	buffer_pool_manager_->DeletePage(leaf_page->GetPageId());     
     }
-    
-    ReleasePageSet(transaction, BPlusTreeActionType::Delete, true);
+    if (transaction) {
+      ReleasePageSet(transaction, BPlusTreeActionType::Delete, true);
+    } else {
+      buffer_pool_manager_->UnpinPage(leaf_page->GetPageId(), true);
+    }
+
     return ;
   }
 
   bool ok = false;
   if (leaf_page->GetSize() < leaf_page->GetMinSize()) {
-    ok = CoalesceOrRedistribute(leaf_page);
-  } 
+    ok = CoalesceOrRedistribute(leaf_page, transaction);
+  }
+  if (!transaction)
+    buffer_pool_manager_->UnpinPage(leaf_page->GetPageId(), true);
   if (ok) {
-    transaction->GetDeletedPageSet()->insert(leaf_page->GetPageId()); 
+    if (transaction)
+      transaction->GetDeletedPageSet()->insert(leaf_page->GetPageId());
+    else {
+      assert(buffer_pool_manager_->DeletePage(leaf_page->GetPageId()));
+    }
   }
 
-  ReleasePageSet(transaction, BPlusTreeActionType::Delete, true);
+  if (transaction)
+    ReleasePageSet(transaction, BPlusTreeActionType::Delete, true);
 }
 
 /*
@@ -362,12 +385,17 @@ bool BPLUSTREE_TYPE::CoalesceOrRedistribute(N *node, Transaction *transaction) {
   bool delete_node = false;
   
   if (node_index - 1 >= 0) {
-    ok = Coalesce(left_sibling_page, node, parent_page, node_index);
+    ok = Coalesce(left_sibling_page, node, parent_page, node_index, transaction);
     delete_node = true;
   } else {
-    ok = Coalesce(node, right_sibling_page, parent_page, node_index);
+    ok = Coalesce(node, right_sibling_page, parent_page, node_index, transaction);
     delete_node = false;
-    transaction->GetDeletedPageSet()->insert(right_sibling_page->GetPageId());
+    buffer_pool_manager_->UnpinPage(right_sibling_page->GetPageId(), true);
+    if (transaction)
+      transaction->GetDeletedPageSet()->insert(right_sibling_page->GetPageId());
+    else {
+      assert(buffer_pool_manager_->DeletePage(right_sibling_page->GetPageId()));
+    }
     right_sibling_page = nullptr;
   }
 
@@ -384,10 +412,9 @@ bool BPLUSTREE_TYPE::CoalesceOrRedistribute(N *node, Transaction *transaction) {
   // this sstyle is ugly
   // but we need do so to make it simpler
   // may be need some optimization
+  buffer_pool_manager_->UnpinPage(parent_page->GetPageId(), true);
   if (ok) {
     transaction->GetDeletedPageSet()->insert(parent_page->GetPageId());
-  } else {
-    buffer_pool_manager_->UnpinPage(parent_page->GetPageId(), true);
   }
 
   return delete_node;
@@ -419,7 +446,7 @@ bool BPLUSTREE_TYPE::Coalesce(
     return AdjustRoot(parent); 
   }
   if (parent->GetSize() < parent->GetMinSize()) 
-    return CoalesceOrRedistribute(parent);
+    return CoalesceOrRedistribute(parent, transaction);
   else
     return false;
 }
@@ -567,7 +594,8 @@ INDEXITERATOR_TYPE BPLUSTREE_TYPE::Begin(const KeyType &key) {
 	new_page->WLatch(); 
 	bpage = reinterpret_cast<BPlusTreePage *>(page->GetData()); 
 	if (bpage->GetSize() < bpage->GetMaxSize()) {
-	  for (unsigned long i=0; i < txn->GetPageSet()->size(); i++) {
+	  unsigned long size = txn->GetPageSet()->size();
+	  for (unsigned long i=0; i < size; i++) {
 	    auto release_page = txn->GetPageSet()->front();
 	    release_page->WUnlatch();
 	    if (txn)
@@ -586,7 +614,8 @@ INDEXITERATOR_TYPE BPLUSTREE_TYPE::Begin(const KeyType &key) {
 	new_page->WLatch(); 
 	bpage = reinterpret_cast<BPlusTreePage *>(page->GetData()); 
 	if (bpage->GetSize() >= bpage->GetMinSize()) {
-	  for (unsigned long i=0; i < txn->GetPageSet()->size(); i++) {
+	  unsigned long size = txn->GetPageSet()->size();
+	  for (unsigned long i=0; i < size; i++) {
 	    auto release_page = txn->GetPageSet()->front();
 	    release_page->WUnlatch();
 	    if (txn)

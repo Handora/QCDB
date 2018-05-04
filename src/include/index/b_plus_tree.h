@@ -87,7 +87,7 @@ private:
   template <typename N> N *Split(N *node);
 
   template <typename N>
-  bool CoalesceOrRedistribute(N *node, Transaction *transaction = nullptr);
+    bool CoalesceOrRedistribute(N *node, Transaction *transaction = nullptr);
 
   template <typename N>
   bool Coalesce(
