@@ -340,6 +340,11 @@ TEST(BPlusTreeTests, ScaleTest) {
     index_key.SetFromInteger(key);
     tree.Insert(index_key, rid, transaction);
   }
+
+  EXPECT_EQ(true, tree.CheckIntegrity());
+  EXPECT_EQ(1, bpm->PinnedNum()); 
+
+  
   std::vector<RID> rids;
   for (auto key : keys) {
     rids.clear();
@@ -349,6 +354,9 @@ TEST(BPlusTreeTests, ScaleTest) {
 
     int64_t value = key & 0xFFFFFFFF;
     EXPECT_EQ(rids[0].GetSlotNum(), value);
+    EXPECT_EQ(true, tree.CheckIntegrity());
+    EXPECT_EQ(1, bpm->PinnedNum());
+    return;
   }
 
   int64_t start_key = 1;

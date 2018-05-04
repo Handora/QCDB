@@ -578,14 +578,16 @@ INDEXITERATOR_TYPE BPLUSTREE_TYPE::Begin(const KeyType &key) {
 
       if (type == BPlusTreeActionType::LookUp) {
 	// using the crabbing protocol, so we first get the =RLock= on
-	// child and release the =RLock= on parent
+	// child and release the =RLock= on parent 
 	auto new_page = buffer_pool_manager_->FetchPage(page_id);
+	assert(new_page != nullptr);
 	new_page->RLatch();
 	if (txn)
-	  txn->AddIntoPageSet(new_page);
+	  txn->AddIntoPageSet(new_page); 
 	page->RUnlatch();
+	buffer_pool_manager_->UnpinPage(page->GetPageId(), false);
 	if (txn)
-	  txn->GetPageSet()->pop_back();
+	  txn->GetPageSet()->pop_back(); 
 	page = new_page;
       } else if (type == BPlusTreeActionType::Insert) {
 	// check for safety and if safe, we just release all
