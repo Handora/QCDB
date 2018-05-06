@@ -154,6 +154,9 @@ namespace cmudb {
   bool BPLUSTREE_TYPE::InsertIntoLeaf(const KeyType &key, const ValueType &value,
 				      Transaction *transaction) {
     auto page = FindLeafPage(key, false, transaction, BPlusTreeActionType::Insert);
+    // std::cout << transaction->GetTransactionId() << " " << key << value << std::endl;
+    // SayTransactionPageSet(transaction);
+      
     auto leaf_page = reinterpret_cast<B_PLUS_TREE_LEAF_PAGE_TYPE*>(page->GetData());
     assert(transaction->GetPageSet()->size() >= 1);
     
@@ -173,10 +176,10 @@ namespace cmudb {
 	new_page->Insert(key, value, comparator_); 
       }
       InsertIntoParent(leaf_page, pop_key, new_page, transaction);
-      buffer_pool_manager_->UnpinPage(new_page->GetPageId(), true);
-    } else {
-      leaf_page->Insert(key, value, comparator_);
-    }
+							     buffer_pool_manager_->UnpinPage(new_page->GetPageId(), true);
+							   } else {
+							     leaf_page->Insert(key, value, comparator_);
+							   }
 
     ReleasePageSet(transaction, BPlusTreeActionType::Insert, true);
     return true;
@@ -558,8 +561,9 @@ INDEXITERATOR_TYPE BPLUSTREE_TYPE::Begin(const KeyType &key) {
     } else {
       page->WLatch();
     }
-    
-    txn->AddIntoPageSet(page); 
+
+    if (txn)
+      txn->AddIntoPageSet(page); 
     
     BPlusTreePage* bpage = reinterpret_cast<BPlusTreePage *>(page->GetData());
   
@@ -591,7 +595,7 @@ INDEXITERATOR_TYPE BPLUSTREE_TYPE::Begin(const KeyType &key) {
 	assert(txn != nullptr);
 	auto new_page = buffer_pool_manager_->FetchPage(page_id);
 	new_page->WLatch(); 
-	bpage = reinterpret_cast<BPlusTreePage *>(page->GetData()); 
+	bpage = reinterpret_cast<BPlusTreePage *>(new_page->GetData()); 
 	if (bpage->GetSize() < bpage->GetMaxSize()) {
 	  unsigned long size = txn->GetPageSet()->size();
 	  for (unsigned long i=0; i < size; i++) {
@@ -601,7 +605,7 @@ INDEXITERATOR_TYPE BPLUSTREE_TYPE::Begin(const KeyType &key) {
 	    int release_page_id = (reinterpret_cast<BPlusTreePage*>(release_page->GetData()))->GetPageId();
 	    buffer_pool_manager_->UnpinPage(release_page_id, false);
 	  }
-	} 
+	}
 	txn->AddIntoPageSet(new_page);
 	page = new_page;
       } else if (type == BPlusTreeActionType::Delete) {
@@ -610,7 +614,7 @@ INDEXITERATOR_TYPE BPLUSTREE_TYPE::Begin(const KeyType &key) {
 	assert(txn != nullptr);
 	auto new_page = buffer_pool_manager_->FetchPage(page_id);
 	new_page->WLatch(); 
-	bpage = reinterpret_cast<BPlusTreePage *>(page->GetData()); 
+	bpage = reinterpret_cast<BPlusTreePage *>(new_page->GetData()); 
 	if (bpage->GetSize() > bpage->GetMinSize()) {
 	  unsigned long size = txn->GetPageSet()->size();
 	  for (unsigned long i=0; i < size; i++) {
@@ -710,6 +714,14 @@ std::string BPLUSTREE_TYPE::ToString(bool verbose) {
   /*****************************************************************************
    * TEST ONLY
    *****************************************************************************/
+  INDEX_TEMPLATE_ARGUMENTS
+  void BPLUSTREE_TYPE::SayTransactionPageSet(Transaction* txn) {
+    auto page_set = txn->GetPageSet(); 
+    for (auto itr=page_set->begin(); itr != page_set->end(); ++itr) {
+      std::cout << (reinterpret_cast<BPlusTreePage *>(*itr))->GetPageId() << "and";
+    }
+    std::cout << std::endl;
+  }
   
   INDEX_TEMPLATE_ARGUMENTS
   void BPLUSTREE_TYPE::SayPage(int page_id) {

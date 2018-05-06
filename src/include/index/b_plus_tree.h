@@ -74,6 +74,8 @@ public:
 
   bool CheckIntegrity() const;
 
+  void SayTransactionPageSet(Transaction* txn);
+
 private:
   void StartNewTree(const KeyType &key, const ValueType &value);
 

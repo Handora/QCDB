@@ -66,17 +66,16 @@ namespace cmudb {
 	int64_t value = key & 0xFFFFFFFF;
 	rid.Set((int32_t)(key >> 32), value);
 	index_key.SetFromInteger(key);
-	auto prev = tree.ToString(true);
 	tree.Insert(index_key, rid, transaction);
-	if (!tree.CheckIntegrity()) {
-	  mu.lock();
-	  std::cout << key << std::endl;
-	  std::cout << prev << std::endl;
-	  std::cout << tree.ToString(true);
-	  flush(std::cout);
-	  mu.unlock();
-	  exit(1);
-	}
+	// if (!tree.CheckIntegrity()) {
+	//   mu.lock();
+	//   std::cout << key << std::endl;
+	//   std::cout << prev << std::endl;
+	//   std::cout << tree.ToString(true);
+	//   flush(std::cout);
+	//   mu.unlock();
+	//   exit(1);
+	// }
       }
     }
     delete transaction;
@@ -387,15 +386,29 @@ namespace cmudb {
     InsertHelper(tree, std::vector<int64_t>(keys.begin(), keys.begin()+3000));
     EXPECT_EQ(true, tree.CheckIntegrity());
     EXPECT_EQ(1, bpm->PinnedNum());
-    // concurrent insert
+    // concurrent insert 
     LaunchParallelTest(10, InsertHelperSplit, std::ref(tree), std::vector<int64_t>(keys.begin()+3000, keys.end()), 10); 
     EXPECT_EQ(true, tree.CheckIntegrity());
     EXPECT_EQ(1, bpm->PinnedNum());
+
+    GenericKey<8> index_key;
+    std::vector<RID> rids;
+    Transaction *transaction = new Transaction(1);
+    for (auto key : keys) {
+      rids.clear();
+      index_key.SetFromInteger(key);
+      tree.GetValue(index_key, rids, transaction);
+      EXPECT_EQ(rids.size(), 1);
+
+      int64_t value = key & 0xFFFFFFFF;
+      EXPECT_EQ(rids[0].GetSlotNum(), value);
+    }
+    
     // concurrent delete 
     LaunchParallelTest(10, DeleteHelperSplit, std::ref(tree), keys, 10);
+    EXPECT_EQ(true, tree.IsEmpty());
     EXPECT_EQ(true, tree.CheckIntegrity());
     EXPECT_EQ(1, bpm->PinnedNum());
-
     bpm->UnpinPage(HEADER_PAGE_ID, true);
     EXPECT_EQ(0, bpm->PinnedNum());
     
