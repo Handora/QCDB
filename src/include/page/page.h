@@ -9,6 +9,7 @@
 #pragma once
 
 #include <cstring>
+#include <thread>
 #include <iostream>
 
 #include "common/config.h"
@@ -29,10 +30,22 @@ public:
   // get page pin count
   inline int GetPinCount() { return pin_count_; }
   // method use to latch/unlatch page content
-  inline void WUnlatch() { rwlatch_.WUnlock(); }
-  inline void WLatch() { rwlatch_.WLock(); }
-  inline void RUnlatch() { rwlatch_.RUnlock(); }
-  inline void RLatch() { rwlatch_.RLock(); }
+  inline void WUnlatch() {
+    // std::cout << std::this_thread::get_id() << "WU" << std::endl;
+    rwlatch_.WUnlock();
+  }
+  inline void WLatch() {
+    // std::cout << std::this_thread::get_id() << "W" << std::endl;
+    rwlatch_.WLock();
+  }
+  inline void RUnlatch() {
+    // std::cout << std::this_thread::get_id() << "RU" << std::endl;
+    rwlatch_.RUnlock();
+  }
+  inline void RLatch() {
+    // std::cout << std::this_thread::get_id() << "R" << std::endl;
+    rwlatch_.RLock();
+  }
 
   inline lsn_t GetLSN() { return *reinterpret_cast<lsn_t *>(GetData() + 4); }
   inline void SetLSN(lsn_t lsn) { memcpy(GetData() + 4, &lsn, 4); }

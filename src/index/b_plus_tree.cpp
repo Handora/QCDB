@@ -40,6 +40,7 @@ namespace cmudb {
    *****************************************************************************/
   INDEX_TEMPLATE_ARGUMENTS
   void BPLUSTREE_TYPE::ReleasePageSet(Transaction *txn, BPlusTreeActionType type, bool dirty) {
+    assert(txn != nullptr);
     unsigned long size = txn->GetPageSet()->size();
     for (unsigned long i=0; i<size; i++) {
       auto release_page = txn->GetPageSet()->front();
@@ -106,6 +107,8 @@ namespace cmudb {
   bool BPLUSTREE_TYPE::Insert(const KeyType &key, const ValueType &value,
 			      Transaction *transaction) {
     // use this block to use lock_guard
+    assert(transaction != nullptr);
+    
     {
       // for concurrent update
       std::lock_guard<std::mutex> latch(root_id_latch_);
@@ -156,11 +159,8 @@ namespace cmudb {
     
     ValueType old_value;
     if (leaf_page->Lookup(key, old_value, comparator_)) {
-      // TODO(Handora): How operate more properly
-      if (transaction)
-	ReleasePageSet(transaction, BPlusTreeActionType::Insert, false); 
-      else
-	buffer_pool_manager_->UnpinPage(leaf_page->GetPageId(), false);
+      // TODO(Handora): How operate more properly 
+      ReleasePageSet(transaction, BPlusTreeActionType::Insert, false);
       return false;
     }
   
@@ -178,10 +178,7 @@ namespace cmudb {
       leaf_page->Insert(key, value, comparator_);
     }
 
-    if (transaction)
-      ReleasePageSet(transaction, BPlusTreeActionType::Insert, true); 
-    else
-      buffer_pool_manager_->UnpinPage(leaf_page->GetPageId(), true);
+    ReleasePageSet(transaction, BPlusTreeActionType::Insert, true);
     return true;
   }
 
@@ -554,16 +551,15 @@ INDEXITERATOR_TYPE BPLUSTREE_TYPE::Begin(const KeyType &key) {
 				     Transaction* txn,
 				     BPlusTreeActionType type) {
 
-    Page* page = buffer_pool_manager_->FetchPage(root_page_id_); 
+    Page* page = buffer_pool_manager_->FetchPage(root_page_id_);
+    assert(page);
     if (type == BPlusTreeActionType::LookUp) {
       page->RLatch();
-      if (txn)
-	txn->AddIntoPageSet(page); 
     } else {
       page->WLatch();
-      if (txn)
-	txn->AddIntoPageSet(page); 
     }
+    
+    txn->AddIntoPageSet(page); 
     
     BPlusTreePage* bpage = reinterpret_cast<BPlusTreePage *>(page->GetData());
   
@@ -587,47 +583,45 @@ INDEXITERATOR_TYPE BPLUSTREE_TYPE::Begin(const KeyType &key) {
 	page->RUnlatch();
 	buffer_pool_manager_->UnpinPage(page->GetPageId(), false);
 	if (txn)
-	  txn->GetPageSet()->pop_back(); 
+	  txn->GetPageSet()->pop_front(); 
 	page = new_page;
       } else if (type == BPlusTreeActionType::Insert) {
 	// check for safety and if safe, we just release all
 	// ancestors' latches, else we just reserve the lock
+	assert(txn != nullptr);
 	auto new_page = buffer_pool_manager_->FetchPage(page_id);
 	new_page->WLatch(); 
 	bpage = reinterpret_cast<BPlusTreePage *>(page->GetData()); 
 	if (bpage->GetSize() < bpage->GetMaxSize()) {
 	  unsigned long size = txn->GetPageSet()->size();
 	  for (unsigned long i=0; i < size; i++) {
-	    auto release_page = txn->GetPageSet()->front();
-	    release_page->WUnlatch();
-	    if (txn)
-	      txn->GetPageSet()->pop_front();
+	    auto release_page = txn->GetPageSet()->front(); 
+	    release_page->WUnlatch(); 
+	    txn->GetPageSet()->pop_front();
 	    int release_page_id = (reinterpret_cast<BPlusTreePage*>(release_page->GetData()))->GetPageId();
 	    buffer_pool_manager_->UnpinPage(release_page_id, false);
 	  }
-	}
-	if (txn)
-	  txn->AddIntoPageSet(new_page);
+	} 
+	txn->AddIntoPageSet(new_page);
 	page = new_page;
       } else if (type == BPlusTreeActionType::Delete) {
 	// check for safety and if safe, we just release all
 	// ancestors' latches, else we just reserve the lock
+	assert(txn != nullptr);
 	auto new_page = buffer_pool_manager_->FetchPage(page_id);
 	new_page->WLatch(); 
 	bpage = reinterpret_cast<BPlusTreePage *>(page->GetData()); 
-	if (bpage->GetSize() >= bpage->GetMinSize()) {
+	if (bpage->GetSize() > bpage->GetMinSize()) {
 	  unsigned long size = txn->GetPageSet()->size();
 	  for (unsigned long i=0; i < size; i++) {
 	    auto release_page = txn->GetPageSet()->front();
-	    release_page->WUnlatch();
-	    if (txn)
-	      txn->GetPageSet()->pop_front();
+	    release_page->WUnlatch(); 
+	    txn->GetPageSet()->pop_front();
 	    int release_page_id = (reinterpret_cast<BPlusTreePage*>(release_page->GetData()))->GetPageId();
 	    buffer_pool_manager_->UnpinPage(release_page_id, false);
 	  }
-	}
-	if (txn)
-	  txn->AddIntoPageSet(new_page);
+	} 
+	txn->AddIntoPageSet(new_page);
 	page = new_page;
       }
       
