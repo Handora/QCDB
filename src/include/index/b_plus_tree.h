@@ -1,3 +1,4 @@
+
 /**
  * b_plus_tree.h
  *
@@ -105,6 +106,7 @@ private:
 
   // member variable
   std::string index_name_;
+  page_id_t trivial_page_id_;
   page_id_t root_page_id_;
   BufferPoolManager *buffer_pool_manager_;
   KeyComparator comparator_;

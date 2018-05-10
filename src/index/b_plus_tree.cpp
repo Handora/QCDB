@@ -19,7 +19,12 @@ namespace cmudb {
 			    const KeyComparator &comparator,
 			    page_id_t root_page_id)
     : index_name_(name), root_page_id_(root_page_id),
-      buffer_pool_manager_(buffer_pool_manager), comparator_(comparator) {}
+      buffer_pool_manager_(buffer_pool_manager), comparator_(comparator) {
+    auto page = buffer_pool_manager_->NewPage(trivial_page_id_);
+    auto bpage = reinterpret_cast<BPlusTreePage *>(page);
+    bpage->SetPageType(IndexPageType::TRIVIAL_PAGE); 
+    buffer_pool_manager_->UnpinPage(trivial_page_id_, true);
+  }
 
 /*
  * Helper function to decide whether current b+tree is empty
@@ -554,7 +559,8 @@ INDEXITERATOR_TYPE BPLUSTREE_TYPE::Begin(const KeyType &key) {
 				     Transaction* txn,
 				     BPlusTreeActionType type) {
 
-    Page* page = buffer_pool_manager_->FetchPage(root_page_id_);
+    Page* page = buffer_pool_manager_->FetchPage(trivial_page_id_);
+    
     assert(page);
     if (type == BPlusTreeActionType::LookUp) {
       page->RLatch();
@@ -568,65 +574,114 @@ INDEXITERATOR_TYPE BPLUSTREE_TYPE::Begin(const KeyType &key) {
     BPlusTreePage* bpage = reinterpret_cast<BPlusTreePage *>(page->GetData());
   
     while (!bpage->IsLeafPage()) {
-      auto internal_page = static_cast<BPlusTreeInternalPage<KeyType, page_id_t, KeyComparator> *>(bpage); 
-      page_id_t page_id;
-      if (leftMost) {
-	page_id = internal_page->ValueAt(0);
-      } else {
-	page_id = internal_page->Lookup(key, comparator_);
-      } 
-
-      if (type == BPlusTreeActionType::LookUp) {
-	// using the crabbing protocol, so we first get the =RLock= on
-	// child and release the =RLock= on parent 
-	auto new_page = buffer_pool_manager_->FetchPage(page_id);
-	assert(new_page != nullptr);
-	new_page->RLatch();
-	if (txn)
-	  txn->AddIntoPageSet(new_page); 
-	page->RUnlatch();
-	buffer_pool_manager_->UnpinPage(page->GetPageId(), false);
-	if (txn)
-	  txn->GetPageSet()->pop_front(); 
-	page = new_page;
-      } else if (type == BPlusTreeActionType::Insert) {
-	// check for safety and if safe, we just release all
-	// ancestors' latches, else we just reserve the lock
-	assert(txn != nullptr);
-	auto new_page = buffer_pool_manager_->FetchPage(page_id);
-	new_page->WLatch(); 
-	bpage = reinterpret_cast<BPlusTreePage *>(new_page->GetData()); 
-	if (bpage->GetSize() < bpage->GetMaxSize()) {
-	  unsigned long size = txn->GetPageSet()->size();
-	  for (unsigned long i=0; i < size; i++) {
+      if (bpage->IsTrivialPage()) {
+	page_id_t root_page_id = root_page_id_;
+	
+	if (type == BPlusTreeActionType::LookUp) {
+	  // using the crabbing protocol, so we first get the =RLock= on
+	  // child and release the =RLock= on parent 
+	  auto new_page = buffer_pool_manager_->FetchPage(root_page_id);
+	  assert(new_page != nullptr);
+	  new_page->RLatch();
+	  if (txn)
+	    txn->AddIntoPageSet(new_page); 
+	  page->RUnlatch();
+	  buffer_pool_manager_->UnpinPage(trivial_page_id_, false);
+	  if (txn)
+	    txn->GetPageSet()->pop_front(); 
+	  page = new_page; 
+	} else if (type == BPlusTreeActionType::Insert) {
+	  // check for safety and if safe, we just release all
+	  // ancestors' latches, else we just reserve the lock
+	  assert(txn != nullptr);
+	  auto new_page = buffer_pool_manager_->FetchPage(root_page_id);
+	  new_page->WLatch(); 
+	  bpage = reinterpret_cast<BPlusTreePage *>(new_page->GetData()); 
+	  if (bpage->GetSize() < bpage->GetMaxSize()) {
 	    auto release_page = txn->GetPageSet()->front(); 
 	    release_page->WUnlatch(); 
-	    txn->GetPageSet()->pop_front();
-	    int release_page_id = (reinterpret_cast<BPlusTreePage*>(release_page->GetData()))->GetPageId();
-	    buffer_pool_manager_->UnpinPage(release_page_id, false);
+	    txn->GetPageSet()->pop_front(); 
+	    buffer_pool_manager_->UnpinPage(trivial_page_id_, false); 
 	  }
-	}
-	txn->AddIntoPageSet(new_page);
-	page = new_page;
-      } else if (type == BPlusTreeActionType::Delete) {
-	// check for safety and if safe, we just release all
-	// ancestors' latches, else we just reserve the lock
-	assert(txn != nullptr);
-	auto new_page = buffer_pool_manager_->FetchPage(page_id);
-	new_page->WLatch(); 
-	bpage = reinterpret_cast<BPlusTreePage *>(new_page->GetData()); 
-	if (bpage->GetSize() > bpage->GetMinSize()) {
-	  unsigned long size = txn->GetPageSet()->size();
-	  for (unsigned long i=0; i < size; i++) {
+	  txn->AddIntoPageSet(new_page);
+	  page = new_page;
+	} else if (type == BPlusTreeActionType::Delete) {
+	  // check for safety and if safe, we just release all
+	  // ancestors' latches, else we just reserve the lock
+	  assert(txn != nullptr);
+	  auto new_page = buffer_pool_manager_->FetchPage(root_page_id);
+	  new_page->WLatch(); 
+	  bpage = reinterpret_cast<BPlusTreePage *>(new_page->GetData()); 
+	  if (bpage->GetSize() > 2) {
 	    auto release_page = txn->GetPageSet()->front();
 	    release_page->WUnlatch(); 
-	    txn->GetPageSet()->pop_front();
-	    int release_page_id = (reinterpret_cast<BPlusTreePage*>(release_page->GetData()))->GetPageId();
-	    buffer_pool_manager_->UnpinPage(release_page_id, false);
-	  }
+	    txn->GetPageSet()->pop_front(); 
+	    buffer_pool_manager_->UnpinPage(trivial_page_id_, false); 
+	  } 
+	  txn->AddIntoPageSet(new_page);
+	  page = new_page;
+	}
+      } else {
+	auto internal_page = static_cast<BPlusTreeInternalPage<KeyType, page_id_t, KeyComparator> *>(bpage); 
+	page_id_t page_id;
+	if (leftMost) {
+	  page_id = internal_page->ValueAt(0);
+	} else {
+	  page_id = internal_page->Lookup(key, comparator_);
 	} 
-	txn->AddIntoPageSet(new_page);
-	page = new_page;
+
+	if (type == BPlusTreeActionType::LookUp) {
+	  // using the crabbing protocol, so we first get the =RLock= on
+	  // child and release the =RLock= on parent 
+	  auto new_page = buffer_pool_manager_->FetchPage(page_id);
+	  assert(new_page != nullptr);
+	  new_page->RLatch();
+	  if (txn)
+	    txn->AddIntoPageSet(new_page); 
+	  page->RUnlatch();
+	  buffer_pool_manager_->UnpinPage(page->GetPageId(), false);
+	  if (txn)
+	    txn->GetPageSet()->pop_front(); 
+	  page = new_page;
+	} else if (type == BPlusTreeActionType::Insert) {
+	  // check for safety and if safe, we just release all
+	  // ancestors' latches, else we just reserve the lock
+	  assert(txn != nullptr);
+	  auto new_page = buffer_pool_manager_->FetchPage(page_id);
+	  new_page->WLatch(); 
+	  bpage = reinterpret_cast<BPlusTreePage *>(new_page->GetData()); 
+	  if (bpage->GetSize() < bpage->GetMaxSize()) {
+	    unsigned long size = txn->GetPageSet()->size();
+	    for (unsigned long i=0; i < size; i++) {
+	      auto release_page = txn->GetPageSet()->front(); 
+	      release_page->WUnlatch(); 
+	      txn->GetPageSet()->pop_front();
+	      int release_page_id = (reinterpret_cast<BPlusTreePage*>(release_page->GetData()))->GetPageId();
+	      buffer_pool_manager_->UnpinPage(release_page_id, false);
+	    }
+	  }
+	  txn->AddIntoPageSet(new_page);
+	  page = new_page;
+	} else if (type == BPlusTreeActionType::Delete) {
+	  // check for safety and if safe, we just release all
+	  // ancestors' latches, else we just reserve the lock
+	  assert(txn != nullptr);
+	  auto new_page = buffer_pool_manager_->FetchPage(page_id);
+	  new_page->WLatch(); 
+	  bpage = reinterpret_cast<BPlusTreePage *>(new_page->GetData()); 
+	  if (bpage->GetSize() > bpage->GetMinSize()) {
+	    unsigned long size = txn->GetPageSet()->size();
+	    for (unsigned long i=0; i < size; i++) {
+	      auto release_page = txn->GetPageSet()->front();
+	      release_page->WUnlatch(); 
+	      txn->GetPageSet()->pop_front();
+	      int release_page_id = (reinterpret_cast<BPlusTreePage*>(release_page->GetData()))->GetPageId();
+	      buffer_pool_manager_->UnpinPage(release_page_id, false);
+	    }
+	  } 
+	  txn->AddIntoPageSet(new_page);
+	  page = new_page;
+	}
       }
       
       bpage = reinterpret_cast<BPlusTreePage *>(page->GetData());         

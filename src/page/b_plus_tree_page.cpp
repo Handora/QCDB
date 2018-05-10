@@ -10,6 +10,7 @@ namespace cmudb {
  * Page type enum class is defined in b_plus_tree_page.h
  */
   bool BPlusTreePage::IsLeafPage() const { return page_type_ == IndexPageType::LEAF_PAGE; }
+  bool BPlusTreePage::IsTrivialPage() const { return page_type_ == IndexPageType::TRIVIAL_PAGE; }
   bool BPlusTreePage::IsRootPage() const { return parent_page_id_ == INVALID_PAGE_ID; }
   void BPlusTreePage::SetPageType(IndexPageType page_type) { page_type_ = page_type; }
 

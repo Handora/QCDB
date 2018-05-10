@@ -64,18 +64,9 @@ namespace cmudb {
     for (auto key : keys) {
       if ((uint64_t)key % total_threads == thread_itr) {
 	int64_t value = key & 0xFFFFFFFF;
-	rid.Set((int32_t)(key >> 32), value);
+	rid.Set((int32_t)(key >> 32), value); 
 	index_key.SetFromInteger(key);
-	tree.Insert(index_key, rid, transaction);
-	// if (!tree.CheckIntegrity()) {
-	//   mu.lock();
-	//   std::cout << key << std::endl;
-	//   std::cout << prev << std::endl;
-	//   std::cout << tree.ToString(true);
-	//   flush(std::cout);
-	//   mu.unlock();
-	//   exit(1);
-	// }
+	EXPECT_EQ(true, tree.Insert(index_key, rid, transaction)); 
       }
     }
     delete transaction;
@@ -121,7 +112,7 @@ namespace cmudb {
     BufferPoolManager *bpm = new BufferPoolManager(50, disk_manager);
     // create b+ tree
     BPlusTree<GenericKey<8>, RID, GenericComparator<8>> tree("foo_pk", bpm,
-							     comparator);
+  							     comparator);
     // create and fetch header_page
     page_id_t page_id;
     auto header_page = bpm->NewPage(page_id);
@@ -150,7 +141,7 @@ namespace cmudb {
     int64_t current_key = start_key;
     index_key.SetFromInteger(start_key);
     for (auto iterator = tree.Begin(index_key); iterator.isEnd() == false;
-	 ++iterator) {
+  	 ++iterator) {
       auto location = (*iterator).second;
       EXPECT_EQ(location.GetPageId(), 0);
       EXPECT_EQ(location.GetSlotNum(), current_key);
@@ -230,7 +221,7 @@ namespace cmudb {
     BufferPoolManager *bpm = new BufferPoolManager(50, disk_manager);
     // create b+ tree
     BPlusTree<GenericKey<8>, RID, GenericComparator<8>> tree("foo_pk", bpm,
-							     comparator);
+  							     comparator);
     GenericKey<8> index_key;
     RID rid;
     // create and fetch header_page
@@ -249,7 +240,7 @@ namespace cmudb {
     int64_t size = 0;
     index_key.SetFromInteger(start_key);
     for (auto iterator = tree.Begin(index_key); iterator.isEnd() == false;
-	 ++iterator) {
+  	 ++iterator) {
       auto location = (*iterator).second;
       EXPECT_EQ(location.GetPageId(), 0);
       EXPECT_EQ(location.GetSlotNum(), current_key);
@@ -276,7 +267,7 @@ namespace cmudb {
     BufferPoolManager *bpm = new BufferPoolManager(50, disk_manager);
     // create b+ tree
     BPlusTree<GenericKey<8>, RID, GenericComparator<8>> tree("foo_pk", bpm,
-							     comparator);
+  							     comparator);
     GenericKey<8> index_key;
     RID rid;
     // create and fetch header_page
@@ -296,7 +287,7 @@ namespace cmudb {
     int64_t size = 0;
     index_key.SetFromInteger(start_key);
     for (auto iterator = tree.Begin(index_key); iterator.isEnd() == false;
-	 ++iterator) {
+  	 ++iterator) {
       auto location = (*iterator).second;
       EXPECT_EQ(location.GetPageId(), 0);
       EXPECT_EQ(location.GetSlotNum(), current_key);
@@ -322,7 +313,7 @@ namespace cmudb {
     BufferPoolManager *bpm = new BufferPoolManager(50, disk_manager);
     // create b+ tree
     BPlusTree<GenericKey<8>, RID, GenericComparator<8>> tree("foo_pk", bpm,
-							     comparator);
+  							     comparator);
     GenericKey<8> index_key;
     RID rid;
 
@@ -347,7 +338,7 @@ namespace cmudb {
     int64_t size = 0;
     index_key.SetFromInteger(start_key);
     for (auto iterator = tree.Begin(index_key); iterator.isEnd() == false;
-	 ++iterator) {
+  	 ++iterator) {
       size = size + 1;
     }
 
@@ -369,7 +360,7 @@ namespace cmudb {
     BufferPoolManager *bpm = new BufferPoolManager(50, disk_manager);
     // create b+ tree
     BPlusTree<GenericKey<8>, RID, GenericComparator<8>> tree("foo_pk", bpm,
-							     comparator); 
+  							     comparator); 
     RID rid;
 
     // create and fetch header_page
@@ -406,6 +397,9 @@ namespace cmudb {
     
     // concurrent delete 
     LaunchParallelTest(10, DeleteHelperSplit, std::ref(tree), keys, 10);
+    if (!tree.IsEmpty()) {
+      std::cout << tree.ToString(true);
+    }
     EXPECT_EQ(true, tree.IsEmpty());
     EXPECT_EQ(true, tree.CheckIntegrity());
     EXPECT_EQ(1, bpm->PinnedNum());
