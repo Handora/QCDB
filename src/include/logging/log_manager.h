@@ -10,6 +10,7 @@
 #include <condition_variable>
 #include <future>
 #include <mutex>
+#include <memory>
 
 #include "disk/disk_manager.h"
 #include "logging/log_record.h"
@@ -22,8 +23,11 @@ public:
       : next_lsn_(0), persistent_lsn_(INVALID_LSN),
         disk_manager_(disk_manager) {
     // TODO: you may intialize your own defined memeber variables here
+    
+    log_offset_ = 0;
+    flush_offset_ = 0;
     log_buffer_ = new char[LOG_BUFFER_SIZE];
-    flush_buffer_ = new char[LOG_BUFFER_SIZE];
+    flush_buffer_ = new char[LOG_BUFFER_SIZE]; 
   }
 
   ~LogManager() {
@@ -38,15 +42,16 @@ public:
 
   // append a log record into log buffer
   lsn_t AppendLogRecord(LogRecord &log_record);
+  bool SafetyForAppend(LogRecord &log_record);
 
   // get/set helper functions
   inline lsn_t GetPersistentLSN() { return persistent_lsn_; }
   inline void SetPersistentLSN(lsn_t lsn) { persistent_lsn_ = lsn; }
-  inline char *GetLogBuffer() { return log_buffer_; }
+  inline char *GetLogBuffer() { return log_buffer_; } 
 
 private:
   // TODO: you may add your own member variables
-  // also remember to change constructor accordingly
+  // also remember to change constructor accordingly 
 
   // atomic counter, record the next log sequence number
   std::atomic<lsn_t> next_lsn_;
@@ -54,7 +59,9 @@ private:
   std::atomic<lsn_t> persistent_lsn_;
   // log buffer related
   char *log_buffer_;
+  int log_offset_;
   char *flush_buffer_;
+  int flush_offset_;
   // latch to protect shared member variables
   std::mutex latch_;
   // flush thread

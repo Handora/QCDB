@@ -612,7 +612,7 @@ INDEXITERATOR_TYPE BPLUSTREE_TYPE::Begin(const KeyType &key) {
 	  auto new_page = buffer_pool_manager_->FetchPage(root_page_id);
 	  new_page->WLatch(); 
 	  bpage = reinterpret_cast<BPlusTreePage *>(new_page->GetData()); 
-	  if (bpage->GetSize() > 2) {
+	  if (bpage->GetSize() > 1) {
 	    auto release_page = txn->GetPageSet()->front();
 	    release_page->WUnlatch(); 
 	    txn->GetPageSet()->pop_front(); 

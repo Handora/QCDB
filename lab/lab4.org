@@ -115,8 +115,8 @@ implementation based on the updates in order to pass test cases.
   section).
 - *Buffer Pool Manager*: We modified the constructor to take in
   references to the system's DiskManager and LogManager as input
-  parameters. The default value for log\_manager is nullptr, and
-  log\_manager is only valid when =ENABLE_LOGGING= is set to be true. We
+  parameters. The default value for log_manager is nullptr, and
+  log_manager is only valid when =ENABLE_LOGGING= is set to be true. We
   have also removed the =FlushAllPage()= function interface.
 - *Disk Manager*: The DiskManager now creates the database file as well
   as log file inside its constructor. We have also provided separate
@@ -129,8 +129,8 @@ implementation based on the updates in order to pass test cases.
   for both =BPlusTreeInternalPage= and =BPlusTreeLeafPage= if you are
   hard-coded metadata size.
 - *Page*: We added =GetLSN= and =SetLSN= helper functions. Remember log
-  sequence number is a 4 byte int32\_t variable that is stored within
-  page data\_ array.
+  sequence number is a 4 byte int32_t variable that is stored within
+  page data_ array.
 - *Transaction*: We added =GetPrevLSN= and =SetPrevLSN= helper
   functions. Each transaction is responsible for maintaining previous
   log sequence number for undo purpose in recovery (detailed
