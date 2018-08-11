@@ -39,7 +39,6 @@ namespace cmudb {
     void SpeakAll() const;
     
   private:
-    // add your own member variables here 
     struct Bucket {
       int local_depth_; 
       std::vector<std::pair<K, V>>  kv_records_;
@@ -50,7 +49,9 @@ namespace cmudb {
     };
     size_t size_;
     int global_depth_ = 0;
-    int num_buckets_ = 1;
+
+	  // buckets number, must be 2^n
+	  int num_buckets_ = 1;
     std::vector<std::shared_ptr<Bucket>> bucket_address_table_;
 
     // latches

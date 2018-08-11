@@ -2015,7 +2015,7 @@ void *pAppData;                /* Argument to xInit() and xShutdown() */
 ** that look at the values of bound parameters, which can make some queries
 ** slower.  But the QPSG has the advantage of more predictable behavior.  With
 ** the QPSG active, SQLite will always use the same query plan in the field as
-** was used during testing in the lab.
+** was used during testing in the doc.
 ** </dd>
 **
 ** </dl>

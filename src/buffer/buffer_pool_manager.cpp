@@ -2,14 +2,14 @@
 
 namespace cmudb {
 
-  /*
-   * BufferPoolManager Constructor
-   * When log_manager is nullptr, logging is disabled (for test purpose)
-   * WARNING: Do Not Edit This Function
-   */
-  BufferPoolManager::BufferPoolManager(size_t pool_size,
-				       DiskManager *disk_manager,
-				       LogManager *log_manager)
+/**
+ * BufferPoolManager Constructor
+ * When log_manager is nullptr, logging is disabled (for test purpose)
+ * WARNING: Do Not Edit This Function
+ */
+BufferPoolManager::BufferPoolManager(size_t pool_size,
+									 DiskManager *disk_manager,
+									 LogManager *log_manager)
     : pool_size_(pool_size), disk_manager_(disk_manager),
       log_manager_(log_manager) {
   // a consecutive memory space for buffer pool
@@ -20,13 +20,12 @@ namespace cmudb {
 
   // put all the pages into free list
   for (size_t i = 0; i < pool_size_; ++i) {
-    free_list_->push_back(&pages_[i]); 
+	free_list_->push_back(&pages_[i]);
   }
 }
 
-/*
+/**
  * BufferPoolManager Deconstructor
- * WARNING: Do Not Edit This Function
  */
 BufferPoolManager::~BufferPoolManager() {
   delete[] pages_;
@@ -102,7 +101,7 @@ bool BufferPoolManager::UnpinPage(page_id_t page_id, bool is_dirty) {
     
   if (ok && page->pin_count_ > 0) {
     if (is_dirty) {
-      page->is_dirty_ = is_dirty;
+	  page->is_dirty_ = true;
     }
     if (--page->pin_count_ == 0) {
       replacer_->Insert(page);
@@ -218,8 +217,5 @@ Page *BufferPoolManager::NewPage(page_id_t &page_id) {
     }
 
     return res;
-    // TODO(Handora): wht std::move wrong?
-    // why
-    // return std::move(res);
   }
 } // namespace cmudb

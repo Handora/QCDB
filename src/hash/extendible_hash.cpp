@@ -183,8 +183,8 @@ namespace cmudb {
       bucket_address_table_.resize(num_buckets_);
       global_depth_++;
       for (int i = num_buckets_/2; i < num_buckets_; ++i) {
-	if (i != num_buckets_/2+static_cast<int>(bucket_id))
-	  bucket_address_table_[i] = bucket_address_table_[i-num_buckets_/2];
+		if (i != num_buckets_ / 2 + static_cast<int>(bucket_id))
+		  bucket_address_table_[i] = bucket_address_table_[i - num_buckets_ / 2];
 	else {
 	  bucket->local_depth_++;
 	  bucket_address_table_[i] = std::make_shared<Bucket>(bucket->local_depth_);

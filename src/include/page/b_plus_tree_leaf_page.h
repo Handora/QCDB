@@ -30,7 +30,7 @@ namespace cmudb {
   BPlusTreeLeafPage<KeyType, ValueType, KeyComparator>
 
 INDEX_TEMPLATE_ARGUMENTS
-  class BPlusTreeLeafPage : public BPlusTreePage {
+class BPlusTreeLeafPage : public BPlusTreePage {
 
 public:
   // After creating a new leaf page from buffer pool, must call initialize
@@ -54,7 +54,7 @@ public:
   void MoveHalfTo(BPlusTreeLeafPage *recipient,
                   BufferPoolManager *buffer_pool_manager /* Unused */);
   void MoveAllTo(BPlusTreeLeafPage *recipient, int /* Unused */,
-                 BufferPoolManager * /* Unused */);
+                 BufferPoolManager *buffer_pool_manager);
   void MoveFirstToEndOf(BPlusTreeLeafPage *recipient,
                         BufferPoolManager *buffer_pool_manager);
   void MoveLastToFrontOf(BPlusTreeLeafPage *recipient, int parentIndex,

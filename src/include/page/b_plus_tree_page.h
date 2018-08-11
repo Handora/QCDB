@@ -33,7 +33,7 @@ namespace cmudb {
   template <typename KeyType, typename ValueType, typename KeyComparator>
 
 // define page type enum
-  enum class IndexPageType { INVALID_INDEX_PAGE = 0, LEAF_PAGE, INTERNAL_PAGE, TRIVIAL_PAGE };
+enum class IndexPageType { INVALID_INDEX_PAGE = 0, LEAF_PAGE, INTERNAL_PAGE, TRIVIAL_PAGE };
 
 // Abstract class.
 class BPlusTreePage {
