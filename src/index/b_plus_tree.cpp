@@ -385,8 +385,8 @@ bool BPLUSTREE_TYPE::CoalesceOrRedistribute(N *node, Transaction *transaction) {
 	}
   }
 
-  bool ok = false;
-  bool delete_node = false;
+  bool ok;
+  bool delete_node;
 
   if (node_index - 1 >= 0) {
 	ok = Coalesce(left_sibling_page, node, parent_page, node_index, transaction);
@@ -570,7 +570,7 @@ Page *BPLUSTREE_TYPE::FindLeafPage(const KeyType &key,
   if (txn)
 	txn->AddIntoPageSet(page);
 
-  BPlusTreePage *bpage = reinterpret_cast<BPlusTreePage *>(page->GetData());
+  auto bpage = reinterpret_cast<BPlusTreePage *>(page->GetData());
 
   while (!bpage->IsLeafPage()) {
 	if (bpage->IsTrivialPage()) {
